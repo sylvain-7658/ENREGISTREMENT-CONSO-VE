@@ -1,0 +1,23 @@
+{
+  "short_name": "Suivi EV",
+  "name": "Suivi Conso EV",
+  "description": "Une application pour suivre la consommation et les coûts de recharge d'un véhicule électrique.",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f1f5f9",
+  "theme_color": "#2563eb"
+}
