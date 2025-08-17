@@ -206,6 +206,30 @@ const Settings: React.FC = () => {
                     </div>
                 </div>
 
+                <div>
+                    <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-200">Comparaison Thermique</h3>
+                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                        Configurez ici les données d'un véhicule thermique de référence pour comparer les coûts.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <InputGroup
+                            label="Consommation thermique"
+                            id="gasolineCarConsumption"
+                            value={localSettings.gasolineCarConsumption}
+                            onChange={handleChange}
+                            unit="L/100km"
+                            step="0.1"
+                        />
+                        <InputGroup
+                            label="Prix de l'essence"
+                            id="gasolinePricePerLiter"
+                            value={localSettings.gasolinePricePerLiter}
+                            onChange={handleChange}
+                            unit="€/L"
+                        />
+                    </div>
+                </div>
+
                 <div className="pt-4 flex justify-end">
                     <button
                         onClick={handleSave}

@@ -7,10 +7,10 @@ import Card from './Card';
 type Period = 'weekly' | 'monthly' | 'yearly';
 
 const Stats: React.FC = () => {
-    const { charges } = useAppContext();
+    const { charges, settings } = useAppContext();
     const [period, setPeriod] = useState<Period>('monthly');
 
-    const statsData = useMemo(() => generateStats(charges, period), [charges, period]);
+    const statsData = useMemo(() => generateStats(charges, period, settings), [charges, period, settings]);
 
     const PeriodButton = ({ p, label }: { p: Period, label: string }) => (
         <button
@@ -119,6 +119,25 @@ const Stats: React.FC = () => {
                                     <Legend />
                                     <Line type="monotone" dataKey="avgConsumption" name="Conso. Moyenne" unit="kWh/100km" stroke="#ff7300" strokeWidth={2} activeDot={{ r: 8 }}>
                                         <LabelList dataKey="avgConsumption" position="top" formatter={(value: number) => value > 0 ? value.toFixed(2) : ''} fontSize={12} />
+                                    </Line>
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Graphique du Coût Moyen / 100km */}
+                    <div>
+                        <h3 className="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200">Coût Moyen / 100km</h3>
+                        <div style={{ width: '100%', height: 300 }}>
+                            <ResponsiveContainer>
+                                <LineChart data={statsData} margin={{ top: 30, right: 20, left: -10, bottom: 5 }}>
+                                     <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.2} />
+                                    <XAxis dataKey="name" />
+                                    <YAxis unit=" €/100km" width={80} domain={['dataMin - 1', 'dataMax + 1']}/>
+                                    <Tooltip content={<CustomTooltip />} />
+                                    <Legend />
+                                    <Line type="monotone" dataKey="avgCostPer100km" name="Coût Moyen" unit="€/100km" stroke="#38bdf8" strokeWidth={2} activeDot={{ r: 8 }}>
+                                        <LabelList dataKey="avgCostPer100km" position="top" formatter={(value: number) => value > 0 ? value.toFixed(2) : ''} fontSize={12} />
                                     </Line>
                                 </LineChart>
                             </ResponsiveContainer>

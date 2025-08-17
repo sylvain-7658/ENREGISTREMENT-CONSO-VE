@@ -1,3 +1,4 @@
+
 export interface Vehicle {
   name: string;
   capacity: number;
@@ -15,6 +16,9 @@ export interface Settings {
   priceTempoWhiteOffPeak: number;
   priceTempoRedPeak: number;
   priceTempoRedOffPeak: number;
+  // Gasoline comparison
+  gasolineCarConsumption: number; // in L/100km
+  gasolinePricePerLiter: number; // in €/L
 }
 
 export enum TariffType {
@@ -45,6 +49,8 @@ export interface ProcessedCharge extends Charge {
   distanceDriven: number | null;
   consumptionKwh100km: number | null;
   pricePerKwh: number;
+  gasolineEquivalentKm: number | null;
+  costPer100km: number | null;
 }
 
 export interface StatsData {
@@ -53,6 +59,8 @@ export interface StatsData {
   totalCost: number;
   totalDistance: number;
   avgConsumption: number;
+  avgCostPer100km: number;
+  totalGasolineCost: number;
 }
 
 export interface User {

@@ -32,6 +32,8 @@ Voici le récapitulatif de votre recharge :
 - Tarif appliqué : ${charge.tariff}
 - Prix par kWh : ${charge.pricePerKwh.toFixed(4)} €
 - Consommation depuis dernière recharge : ${charge.consumptionKwh100km !== null ? `${charge.consumptionKwh100km.toFixed(2)} kWh/100km` : 'N/A'}
+- Coût par 100km : ${charge.costPer100km !== null ? `${charge.costPer100km.toFixed(2)} €/100km` : 'N/A'}
+- Équivalent distance thermique : ${charge.gasolineEquivalentKm !== null ? `${charge.gasolineEquivalentKm} km` : 'N/A'}
 
 Cordialement,
 Votre application Suivi Conso EV
@@ -46,7 +48,7 @@ Votre application Suivi Conso EV
         if (!charges.length) return;
 
         const headers = [
-            "Date", "Kilométrage", "Batterie", "kWh Ajoutés", "Coût", "Tarif", "Prix/kWh", "Conso. (kWh/100km)"
+            "Date", "Kilométrage", "Batterie", "kWh Ajoutés", "Coût", "Tarif", "Prix/kWh", "Conso. (kWh/100km)", "Coût (€/100km)", "Équivalent Thermique (km)"
         ];
 
         const escapeCsvCell = (cell: any): string => {
@@ -62,7 +64,9 @@ Votre application Suivi Conso EV
             c.cost.toFixed(2),
             c.tariff,
             c.pricePerKwh.toFixed(4),
-            c.consumptionKwh100km !== null ? c.consumptionKwh100km.toFixed(2) : ''
+            c.consumptionKwh100km !== null ? c.consumptionKwh100km.toFixed(2) : '',
+            c.costPer100km !== null ? c.costPer100km.toFixed(2) : '',
+            c.gasolineEquivalentKm !== null ? c.gasolineEquivalentKm : ''
         ].map(escapeCsvCell).join(';'));
 
         const csvContent = [headers.map(escapeCsvCell).join(';'), ...rows].join('\n');
@@ -335,6 +339,8 @@ Votre application Suivi Conso EV
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Tarif</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Prix/kWh</th>
                                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Conso. (kWh/100km)</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Coût / 100km</th>
+                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Équiv. Thermique (km)</th>
                                  <th scope="col" className="relative px-6 py-3 no-print no-pdf">
                                     <span className="sr-only">Actions</span>
                                 </th>
@@ -354,6 +360,18 @@ Votre application Suivi Conso EV
                                         {charge.consumptionKwh100km !== null 
                                           ? <span className="font-semibold text-blue-600 dark:text-blue-400">{charge.consumptionKwh100km.toFixed(2)}</span> 
                                           : <span className="text-slate-400">-</span>
+                                        }
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">
+                                        {charge.costPer100km !== null 
+                                            ? <span className="font-semibold text-orange-600 dark:text-orange-400">{charge.costPer100km.toFixed(2)} €</span> 
+                                            : <span className="text-slate-400">-</span>
+                                        }
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">
+                                        {charge.gasolineEquivalentKm !== null 
+                                            ? <span className="font-semibold text-green-600 dark:text-green-400">{charge.gasolineEquivalentKm.toLocaleString('fr-FR')} km</span> 
+                                            : <span className="text-slate-400">-</span>
                                         }
                                     </td>
                                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium no-print no-pdf">

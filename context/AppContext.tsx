@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useMemo, FC, PropsWithChildren, useState } from 'react';
 import { Settings, Charge, ProcessedCharge, Vehicle } from '../types';
 import { processCharges } from '../utils/calculations';
@@ -27,6 +28,8 @@ const defaultSettings: Settings = {
   priceTempoWhiteOffPeak: 0.1486,
   priceTempoRedPeak: 0.7562,
   priceTempoRedOffPeak: 0.1526,
+  gasolineCarConsumption: 6.5,
+  gasolinePricePerLiter: 1.90,
 };
 
 // AppProvider utilise maintenant le stockage local et n'a plus besoin d'un userId.

@@ -1,10 +1,11 @@
+
 import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { useAppContext } from '../context/AppContext';
 import { generateStats } from '../utils/calculations';
 import Card from './Card';
 import { View } from '../../App';
-import { ArrowRight, BarChart3, BatteryCharging, Euro, Gauge, PlusCircle, Settings, History } from 'lucide-react';
+import { ArrowRight, BarChart3, Euro, Gauge, PlusCircle, Settings, History } from 'lucide-react';
 
 
 const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, subtext?: string }> = ({ title, value, icon, subtext }) => (
@@ -16,38 +17,52 @@ const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, 
             <div>
                 <p className="text-sm text-slate-500 dark:text-slate-400">{title}</p>
                 <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{value}</p>
-                 {subtext && <p className="text-xs text-slate-400 dark:text-slate-500">{subtext}</p>}
+                 {subtext && <p className="text-sm font-medium text-green-600 dark:text-green-400 mt-1">{subtext}</p>}
             </div>
         </div>
     </Card>
 );
 
 const Dashboard: React.FC<{ setActiveView: (view: View) => void }> = ({ setActiveView }) => {
-    const { charges } = useAppContext();
+    const { charges, settings } = useAppContext();
     
     const summary = useMemo(() => {
         if (charges.length === 0) {
-            return { totalCost: 0, totalDistance: 0, totalKwh: 0, avgConsumption: 0, lastCharge: null };
+            return { totalCost: 0, totalDistance: 0, avgConsumption: 0, lastCharge: null, savings: null, avgCostPer100km: 0, gasCostPer100km: null };
         }
         const totalCost = charges.reduce((sum, c) => sum + c.cost, 0);
         const totalDistance = charges.reduce((sum, c) => sum + (c.distanceDriven || 0), 0);
         const totalKwh = charges.reduce((sum, c) => sum + c.kwhAdded, 0);
         const avgConsumption = totalDistance > 0 ? (totalKwh / totalDistance) * 100 : 0;
         const lastCharge = charges[charges.length - 1];
+
+        const totalTripCost = charges.reduce((sum, c) => sum + ((c.costPer100km || 0) * (c.distanceDriven || 0) / 100), 0);
+        const avgCostPer100km = totalDistance > 0 ? (totalTripCost / totalDistance) * 100 : 0;
+
+
+        let savings: number | null = null;
+        let gasCostPer100km: number | null = null;
+        if (totalDistance > 0 && settings.gasolineCarConsumption > 0 && settings.gasolinePricePerLiter > 0) {
+            const totalGasolineCost = (totalDistance / 100) * settings.gasolineCarConsumption * settings.gasolinePricePerLiter;
+            savings = totalGasolineCost - totalCost;
+            gasCostPer100km = settings.gasolineCarConsumption * settings.gasolinePricePerLiter;
+        }
         
         return {
             totalCost,
             totalDistance,
-            totalKwh,
             avgConsumption,
             lastCharge,
+            savings,
+            avgCostPer100km,
+            gasCostPer100km,
         };
-    }, [charges]);
+    }, [charges, settings]);
 
     const monthlyStats = useMemo(() => {
-        const stats = generateStats(charges, 'monthly');
+        const stats = generateStats(charges, 'monthly', settings);
         return stats.slice(-6); // Get last 6 months
-    }, [charges]);
+    }, [charges, settings]);
 
     if (charges.length < 2) {
         return (
@@ -77,6 +92,7 @@ const Dashboard: React.FC<{ setActiveView: (view: View) => void }> = ({ setActiv
                     title="Total Dépensé"
                     value={`${summary.totalCost.toFixed(2)} €`}
                     icon={<Euro className="text-blue-600 dark:text-blue-400" />}
+                    subtext={summary.savings !== null && summary.savings > 0 ? `soit ${summary.savings.toFixed(2)} € économisés` : undefined}
                  />
                  <StatCard 
                     title="Distance Totale"
@@ -84,9 +100,10 @@ const Dashboard: React.FC<{ setActiveView: (view: View) => void }> = ({ setActiv
                     icon={<Gauge className="text-blue-600 dark:text-blue-400" />}
                  />
                  <StatCard 
-                    title="Énergie Totale"
-                    value={`${summary.totalKwh.toFixed(2)} kWh`}
-                    icon={<BatteryCharging className="text-blue-600 dark:text-blue-400" />}
+                    title="Coût Moyen"
+                    value={`${summary.avgCostPer100km.toFixed(2)} €`}
+                    subtext={summary.gasCostPer100km ? `vs ${summary.gasCostPer100km.toFixed(2)}€ en thermique` : '/100km'}
+                    icon={<Euro className="text-blue-600 dark:text-blue-400" />}
                  />
                  <StatCard 
                     title="Conso. Moyenne"
