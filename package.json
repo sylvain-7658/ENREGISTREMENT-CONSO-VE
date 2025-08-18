@@ -1,5 +1,5 @@
 {
-  "name": "ev-version-weeb-sans-id",
+  "name": "verson-stockage-en-ligne-facile",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -15,7 +15,8 @@
     "lucide-react": "^0.533.0",
     "xlsx": "^0.18.5",
     "jspdf": "^2.5.1",
-    "html2canvas": "^1.4.1"
+    "html2canvas": "^1.4.1",
+    "framer-motion": "^11.3.19"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

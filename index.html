@@ -10,22 +10,54 @@
     <meta name="theme-color" content="#2563eb" />
     <link rel="apple-touch-icon" href="/icon-192x192.png" />
 
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+          }
+        }
+      }
+    </script>
     <style>
-      /* Simple scrollbar styling for a more modern look */
+      :root {
+        --background-light: #f8fafc; /* slate-50 */
+        --background-dark: #0f172a;  /* slate-900 */
+        --card-background-light: #ffffff;
+        --card-background-dark: #1e293b; /* slate-800 */
+        --text-light-primary: #1e293b; /* slate-800 */
+        --text-dark-primary: #e2e8f0;  /* slate-200 */
+        --text-light-secondary: #475569; /* slate-600 */
+        --text-dark-secondary: #94a3b8; /* slate-400 */
+        --accent-color: #3b82f6; /* blue-500 */
+        --accent-color-hover: #2563eb; /* blue-600 */
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+      }
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #f1f1f1;
+        background: #e2e8f0; /* slate-200 */
+      }
+      .dark ::-webkit-scrollbar-track {
+        background: #334155; /* slate-700 */
       }
       ::-webkit-scrollbar-thumb {
-        background: #888;
+        background: #94a3b8; /* slate-400 */
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #555;
+        background: #64748b; /* slate-500 */
       }
       @media print {
         .no-print {
@@ -46,13 +78,14 @@
     "lucide-react": "https://esm.sh/lucide-react@^0.533.0",
     "xlsx": "https://esm.sh/xlsx@^0.18.5",
     "jspdf": "https://esm.sh/jspdf@^2.5.1",
-    "html2canvas": "https://esm.sh/html2canvas@^1.4.1"
+    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
+    "framer-motion": "https://esm.sh/framer-motion@^11.3.19"
   }
 }
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200">
+  <body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-200 antialiased">
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

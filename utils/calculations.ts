@@ -1,5 +1,5 @@
 
-import { Charge, ProcessedCharge, Settings, StatsData, TariffType } from '../types';
+import { Charge, ProcessedCharge, ProcessedTrip, Settings, StatsData, TariffType, Trip, TripStatsData, ClientStats, DestinationStats, MaintenanceEntry, ProcessedMaintenanceEntry } from '../types';
 
 // Les tarifs en courant alternatif (AC) sont sujets à des pertes lors de la recharge, de la prise à la batterie.
 const AC_TARIFFS: TariffType[] = [
@@ -143,4 +143,164 @@ export const generateStats = (charges: ProcessedCharge[], period: 'weekly' | 'mo
   });
   
   return stats.sort((a,b) => a.name.localeCompare(b.name));
+};
+
+export const generateTripStats = (trips: ProcessedTrip[], period: 'weekly' | 'monthly' | 'yearly'): TripStatsData[] => {
+  const groups: { [key: string]: { trips: ProcessedTrip[] } } = {};
+
+  trips.forEach(trip => {
+    const date = new Date(trip.date);
+    let key = '';
+    if (period === 'monthly') {
+      key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    } else if (period === 'yearly') {
+      key = `${date.getFullYear()}`;
+    } else if (period === 'weekly') {
+      key = `${date.getFullYear()}-W${String(getWeek(date)).padStart(2, '0')}`;
+    }
+
+    if (!groups[key]) {
+      groups[key] = { trips: [] };
+    }
+    groups[key].trips.push(trip);
+  });
+
+  const stats: TripStatsData[] = Object.keys(groups).map(key => {
+    const groupTrips = groups[key].trips;
+    const totalDistance = groupTrips.reduce((sum, t) => sum + t.distance, 0);
+    const totalCost = groupTrips.reduce((sum, t) => sum + t.cost, 0);
+    const totalSavings = groupTrips.reduce((sum, t) => sum + t.savings, 0);
+    const totalBillingAmount = groupTrips.reduce((sum, t) => sum + (t.billingAmount || 0), 0);
+    
+    return {
+      name: key,
+      totalDistance: parseFloat(totalDistance.toFixed(0)),
+      totalCost: parseFloat(totalCost.toFixed(2)),
+      totalSavings: parseFloat(totalSavings.toFixed(2)),
+      totalBillingAmount: parseFloat(totalBillingAmount.toFixed(2)),
+    };
+  });
+
+  return stats.sort((a, b) => a.name.localeCompare(b.name));
+};
+
+
+export const processTrips = (trips: Trip[], settings: Settings, lastCharge: ProcessedCharge | undefined): ProcessedTrip[] => {
+  const sortedTrips = [...trips].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.endOdometer - a.endOdometer);
+  
+  const pricePerKwh = lastCharge?.pricePerKwh || 0;
+
+  return sortedTrips.map(trip => {
+    const distance = trip.endOdometer - trip.startOdometer;
+    if (distance <= 0) {
+      return {
+        ...trip,
+        distance: 0,
+        kwhConsumed: 0,
+        cost: 0,
+        consumptionKwh100km: 0,
+        pricePerKwh: pricePerKwh,
+        gasolineEquivalentCost: 0,
+        savings: 0,
+        billingAmount: undefined,
+      };
+    }
+
+    const percentConsumed = trip.startPercentage - trip.endPercentage;
+    const kwhConsumed = (percentConsumed / 100) * settings.batteryCapacity;
+    const cost = kwhConsumed * pricePerKwh;
+    const consumptionKwh100km = (kwhConsumed / distance) * 100;
+
+    let gasolineEquivalentCost = 0;
+    let savings = 0;
+    if (settings.gasolineCarConsumption > 0 && settings.gasolinePricePerLiter > 0) {
+      gasolineEquivalentCost = (distance / 100) * settings.gasolineCarConsumption * settings.gasolinePricePerLiter;
+      savings = gasolineEquivalentCost - cost;
+    }
+
+    let billingAmount: number | undefined = undefined;
+    if (trip.isBilled) {
+        if (distance < 11) {
+            billingAmount = settings.billingRateLocal;
+        } else if (distance >= 11 && distance <= 30) {
+            billingAmount = settings.billingRateMedium;
+        } else { // distance > 30
+            const fiscalPower = settings.fiscalPower || 4;
+            let rate = 0;
+            if (fiscalPower <= 3) {
+                rate = 0.529;
+            } else if (fiscalPower === 4) {
+                rate = 0.606;
+            } else { // 5 CV and more
+                rate = 0.636;
+            }
+            billingAmount = distance * rate;
+        }
+    }
+
+    return {
+      ...trip,
+      distance: parseFloat(distance.toFixed(0)),
+      kwhConsumed: parseFloat(kwhConsumed.toFixed(2)),
+      cost: parseFloat(cost.toFixed(2)),
+      consumptionKwh100km: parseFloat(consumptionKwh100km.toFixed(2)),
+      pricePerKwh: pricePerKwh,
+      gasolineEquivalentCost: parseFloat(gasolineEquivalentCost.toFixed(2)),
+      savings: parseFloat(savings.toFixed(2)),
+      billingAmount: billingAmount ? parseFloat(billingAmount.toFixed(2)) : undefined,
+    };
+  });
+};
+
+export const generateClientStats = (trips: ProcessedTrip[]): ClientStats[] => {
+  const clientMap: { [key: string]: { tripCount: number; totalDistance: number; totalBillingAmount: number } } = {};
+
+  trips.forEach(trip => {
+    const clientName = trip.client || 'Non spécifié';
+    if (!clientMap[clientName]) {
+      clientMap[clientName] = { tripCount: 0, totalDistance: 0, totalBillingAmount: 0 };
+    }
+    clientMap[clientName].tripCount++;
+    clientMap[clientName].totalDistance += trip.distance;
+    clientMap[clientName].totalBillingAmount += trip.billingAmount || 0;
+  });
+
+  const stats: ClientStats[] = Object.keys(clientMap).map(name => ({
+    name,
+    tripCount: clientMap[name].tripCount,
+    totalDistance: parseFloat(clientMap[name].totalDistance.toFixed(0)),
+    totalBillingAmount: parseFloat(clientMap[name].totalBillingAmount.toFixed(2)),
+  }));
+
+  return stats.sort((a, b) => b.totalBillingAmount - a.totalBillingAmount);
+};
+
+export const generateDestinationStats = (trips: ProcessedTrip[]): DestinationStats[] => {
+  const destinationMap: { [key: string]: { tripCount: number; totalDistance: number } } = {};
+
+  trips.forEach(trip => {
+    const destinationName = trip.destination;
+    if (!destinationMap[destinationName]) {
+      destinationMap[destinationName] = { tripCount: 0, totalDistance: 0 };
+    }
+    destinationMap[destinationName].tripCount++;
+    destinationMap[destinationName].totalDistance += trip.distance;
+  });
+
+  const stats: DestinationStats[] = Object.keys(destinationMap).map(name => {
+    const data = destinationMap[name];
+    return {
+      name,
+      tripCount: data.tripCount,
+      totalDistance: parseFloat(data.totalDistance.toFixed(0)),
+      avgDistance: parseFloat((data.totalDistance / data.tripCount).toFixed(0)),
+    };
+  });
+
+  return stats.sort((a, b) => b.tripCount - a.tripCount);
+};
+
+export const processMaintenanceEntries = (entries: MaintenanceEntry[]): ProcessedMaintenanceEntry[] => {
+  const sortedEntries = [...entries].sort((a, b) => b.odometer - a.odometer);
+  return sortedEntries;
 };

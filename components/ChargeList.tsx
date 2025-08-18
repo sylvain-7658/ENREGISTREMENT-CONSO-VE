@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { TariffType, StatsData } from '../types';
@@ -32,12 +31,12 @@ const SummarySection: React.FC<{
                 <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                     <thead className="bg-slate-50 dark:bg-slate-700/50">
                         <tr>
-                            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Période</th>
-                            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Distance</th>
-                            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">kWh Total</th>
-                            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Coût Total</th>
-                            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Conso. Moyenne</th>
-                            <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Coût Moyen / 100km</th>
+                            <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Période</th>
+                            <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Distance</th>
+                            <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">kWh Total</th>
+                            <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Coût Total</th>
+                            <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Conso. Moyenne</th>
+                            <th scope="col" className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Coût / 100km</th>
                         </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
@@ -48,13 +47,13 @@ const SummarySection: React.FC<{
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{stat.totalKwh.toFixed(2)} kWh</td>
                                 <td className="px-4 py-3 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">
                                     <div>
-                                        <span className="font-medium text-slate-800 dark:text-slate-100">{stat.totalCost.toFixed(2)} €</span>
+                                        <span className="font-semibold text-slate-800 dark:text-slate-100">{stat.totalCost.toFixed(2)} €</span>
                                         {stat.totalGasolineCost > 0 && (
                                             <span className="text-xs ml-2 text-slate-400">(vs {stat.totalGasolineCost.toFixed(2)} €)</span>
                                         )}
                                     </div>
                                     {stat.totalGasolineCost > stat.totalCost && stat.totalCost > 0 && (
-                                        <div className="text-xs font-medium text-green-600 dark:text-green-400">
+                                        <div className="text-xs font-bold text-green-600 dark:text-green-400 mt-1">
                                             Économie de {(stat.totalGasolineCost - stat.totalCost).toFixed(2)} €
                                         </div>
                                     )}
@@ -79,8 +78,14 @@ const SummarySection: React.FC<{
 };
 
 const ChargeList: React.FC = () => {
-    const { charges, settings } = useAppContext();
+    const { charges, settings, currentUser } = useAppContext();
     const [period, setPeriod] = useState<Period>('monthly');
+    const vehicleInfoText = useMemo(() => {
+        if (settings.registrationNumber) {
+            return `${settings.vehicleModel} (${settings.registrationNumber})`;
+        }
+        return settings.vehicleModel;
+    }, [settings.vehicleModel, settings.registrationNumber]);
 
     const globalStatsData = useMemo(() => {
         if (charges.length < 1) return [];
@@ -120,19 +125,26 @@ const ChargeList: React.FC = () => {
 
     return (
         <div className="pb-4">
-            <div className="px-6 pt-6 pb-2 flex flex-col sm:flex-row justify-between items-start sm:items-center no-print">
-                 <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4 sm:mb-0">
-                    Résumés par période
-                </h2>
-                <div className="flex space-x-1 p-1 bg-slate-100 dark:bg-slate-700 rounded-lg">
+            <div className="px-6 pt-6 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center no-print">
+                 <div>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+                        Résumés par période
+                    </h2>
+                     <div className="text-sm text-slate-500 dark:text-slate-400 mt-1 space-x-2">
+                        {currentUser && <span>Profil: <span className="font-semibold text-slate-600 dark:text-slate-300">{currentUser.name}</span></span>}
+                        {currentUser && vehicleInfoText && <span className="text-slate-400">&bull;</span>}
+                        {vehicleInfoText && <span>Véhicule: <span className="font-semibold text-slate-600 dark:text-slate-300">{vehicleInfoText}</span></span>}
+                    </div>
+                </div>
+                <div className="flex space-x-1 p-1 bg-slate-200 dark:bg-slate-700/50 rounded-lg mt-4 sm:mt-0">
                     {periodOptions.map((opt) => (
                         <button
                             key={opt.key}
                             onClick={() => setPeriod(opt.key)}
-                            className={`px-3 py-1 text-sm font-medium rounded-md transition-colors duration-200 ${
+                            className={`px-4 py-1.5 text-sm font-semibold rounded-md transition-colors duration-200 ${
                                 period === opt.key
-                                    ? 'bg-blue-600 text-white shadow'
-                                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                                    ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow'
+                                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-300/50 dark:hover:bg-slate-600/50'
                             }`}
                         >
                             {opt.label}

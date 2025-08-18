@@ -1,16 +1,32 @@
-
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Trash2, Download, Upload, Mail, FileDown } from 'lucide-react';
+import { Trash2, Download, Upload, Mail, FileDown, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Charge, ProcessedCharge, TariffType } from '../types';
 
+const ITEMS_PER_PAGE = 10;
+
 const ChargeDetails: React.FC = () => {
-    const { charges, deleteCharge, importCharges, settings } = useAppContext();
+    const { charges, deleteCharge, importCharges, settings, currentUser } = useAppContext();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isExportingPdf, setIsExportingPdf] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const reversedCharges = useMemo(() => [...charges].reverse(), [charges]);
+    const vehicleInfoText = useMemo(() => {
+        if (settings.registrationNumber) {
+            return `${settings.vehicleModel} (${settings.registrationNumber})`;
+        }
+        return settings.vehicleModel;
+    }, [settings.vehicleModel, settings.registrationNumber]);
+
+    const totalPages = Math.ceil(reversedCharges.length / ITEMS_PER_PAGE);
+    const paginatedCharges = useMemo(() => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        return reversedCharges.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+    }, [currentPage, reversedCharges]);
 
     const handleSendEmail = (charge: ProcessedCharge) => {
         if (!settings.recapEmail || !/^\S+@\S+\.\S+$/.test(settings.recapEmail)) {
@@ -56,7 +72,7 @@ Votre application Suivi Conso EV
             return `"${cellStr}"`;
         };
         
-        const rows = charges.map(c => [
+        const rows = reversedCharges.map(c => [
             c.date.split('T')[0],
             c.odometer,
             `${c.startPercentage}% → ${c.endPercentage}%`,
@@ -223,183 +239,161 @@ Votre application Suivi Conso EV
                 };
 
                 if (newCharge.tariff === TariffType.QUICK_CHARGE) {
-                    const price = parseFloat(String(customPrice).replace(',', '.'));
-                    if (isNaN(price) || price <= 0) {
-                        errors.push(`Ligne ${index + 2}: Pour le tarif '${TariffType.QUICK_CHARGE}', un 'Prix/kWh (€)' valide est requis.`);
+                    const priceNum = customPrice ? parseFloat(String(customPrice).replace(',', '.')) : NaN;
+                    if (isNaN(priceNum) || priceNum <= 0) {
+                        errors.push(`Ligne ${index + 2}: Prix/kWh invalide pour recharge rapide.`);
                         return;
                     }
-                    newCharge.customPrice = price;
+                    newCharge.customPrice = priceNum;
                 }
 
                 chargesToImport.push(newCharge);
             });
 
             if (errors.length > 0) {
-                alert(`Erreurs lors de la validation des données :\n\n${errors.slice(0, 10).join('\n')}${errors.length > 10 ? '\n...' : ''}`);
+                alert(`Erreurs lors de l'importation :\n\n- ${errors.join('\n- ')}`);
                 return;
             }
 
             if (chargesToImport.length > 0) {
                 const { addedCount, skippedCount } = await importCharges(chargesToImport);
-                let message = "";
-                if (addedCount > 0) message += `${addedCount} nouvelle(s) recharge(s) importée(s).\n`;
-                if (skippedCount > 0) message += `${skippedCount} recharge(s) ignorée(s) (doublons basés sur le kilométrage).\n`;
-                if (!message) message = "Aucune nouvelle recharge à importer (toutes les entrées existent déjà).";
-                alert(message.trim());
+                let message = `${addedCount} recharge(s) importée(s) avec succès.`;
+                if (skippedCount > 0) {
+                    message += ` ${skippedCount} recharge(s) ignorée(s) car déjà présente(s) (basé sur le kilométrage).`;
+                }
+                alert(message);
             } else {
-                alert("Aucune recharge valide trouvée dans le fichier.");
+                alert("Aucune nouvelle recharge à importer n'a été trouvée dans le fichier.");
             }
 
         } catch (error) {
-            console.error("Erreur lors de l'importation du fichier :", error);
-            alert("Une erreur est survenue lors de la lecture du fichier. Assurez-vous que c'est un fichier .xlsx ou .csv valide avec les bonnes colonnes.");
+            console.error("Erreur d'importation :", error);
+            alert("Une erreur est survenue lors de la lecture du fichier. Assurez-vous qu'il est au format XLSX ou CSV.");
         }
     };
 
     if (charges.length === 0) {
         return (
-            <div className="text-center py-10 px-6">
-                <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                    <path vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                </svg>
-                <h3 className="mt-2 text-sm font-medium text-slate-900 dark:text-white">Aucune recharge</h3>
-                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Commencez par ajouter une nouvelle recharge ou importez un historique.</p>
-                <div className="no-print">
-                    <button
-                        onClick={handleImportClick}
-                        className="mt-4 flex mx-auto items-center gap-2 px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-blue-500 transition-colors"
-                        aria-label="Importer un historique"
-                    >
-                        <Upload size={16} />
-                        Importer un fichier
+             <div className="text-center py-16 px-6">
+                <Zap size={48} className="mx-auto text-slate-400" />
+                <h3 className="text-xl font-bold mt-4 mb-2 text-slate-800 dark:text-slate-100">Aucune recharge enregistrée</h3>
+                <p className="text-slate-500 dark:text-slate-400 mb-6">Ajoutez une recharge pour commencer à suivre vos données.</p>
+                <div className="flex justify-center items-center gap-4 no-print">
+                    <button onClick={handleImportClick} className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg shadow-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                        <Upload size={16} /> Importer un fichier
                     </button>
+                    <p>ou ajoutez-la manuellement ci-dessus.</p>
                 </div>
-                 <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileImport}
-                    accept=".xlsx, .xls, .csv"
-                    className="hidden"
-                />
+                 <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
             </div>
         );
     }
-    
-    const reversedCharges = [...charges].reverse();
 
     return (
-        <div>
-             <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileImport}
-                accept=".xlsx, .xls, .csv"
-                className="hidden"
-            />
-            <div className="p-6 flex justify-between items-center flex-wrap gap-4 no-pdf">
-                 <div className="flex items-center gap-2 no-print ml-auto">
-                     <button
-                        onClick={handleImportClick}
-                        className="flex items-center gap-2 px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-blue-500 transition-colors"
-                        aria-label="Importer un historique"
-                    >
-                        <Upload size={16} />
-                        Importer
+        <div id="charge-list-details">
+            <div className="px-6 pt-6 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
+                        Détail des recharges
+                    </h2>
+                     <div className="text-sm text-slate-500 dark:text-slate-400 mt-1 space-x-2">
+                        {currentUser && <span>Profil: <span className="font-semibold text-slate-600 dark:text-slate-300">{currentUser.name}</span></span>}
+                        {currentUser && vehicleInfoText && <span className="text-slate-400">&bull;</span>}
+                        {vehicleInfoText && <span>Véhicule: <span className="font-semibold text-slate-600 dark:text-slate-300">{vehicleInfoText}</span></span>}
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 mt-4 sm:mt-0 no-print">
+                    <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
+                    <button onClick={handleImportClick} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="Importer depuis un fichier (XLSX, CSV)">
+                        <Upload size={20} />
                     </button>
-                    <button
-                        onClick={handleDownload}
-                        className="flex items-center gap-2 px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-blue-500 transition-colors"
-                        aria-label="Exporter l'historique en CSV"
-                    >
-                        <Download size={16} />
-                        Exporter CSV
+                    <button onClick={handleDownload} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="Exporter en CSV">
+                        <Download size={20} />
                     </button>
-                     <button
-                        onClick={handleExportPdf}
-                        disabled={isExportingPdf}
-                        className="flex items-center gap-2 px-3 py-1.5 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-md shadow-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-blue-500 transition-colors disabled:opacity-50"
-                        aria-label="Exporter l'historique en PDF"
-                    >
-                        <FileDown size={16} />
-                        {isExportingPdf ? 'Exportation...' : 'Exporter PDF'}
+                     <button onClick={handleExportPdf} className="p-2 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" title="Exporter en PDF" disabled={isExportingPdf}>
+                        <FileDown size={20} />
                     </button>
-                 </div>
-            </div>
-
-            <div id="charge-list-details" className="border-t border-slate-200 dark:border-slate-700">
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                        <thead className="bg-slate-50 dark:bg-slate-700/50">
-                            <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Date</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Kilométrage</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Batterie</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">kWh Ajoutés</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Coût</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Tarif</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Prix/kWh</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Conso. (kWh/100km)</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Coût / 100km</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-300 uppercase tracking-wider">Équiv. Thermique (km)</th>
-                                 <th scope="col" className="relative px-6 py-3 no-print no-pdf">
-                                    <span className="sr-only">Actions</span>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                            {reversedCharges.map(charge => (
-                                <tr key={charge.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors duration-150">
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-slate-100">{new Date(charge.date).toLocaleDateString('fr-FR')}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{charge.odometer.toLocaleString('fr-FR')} km</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{charge.startPercentage}% → {charge.endPercentage}%</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{charge.kwhAdded.toFixed(2)} kWh</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{charge.cost.toFixed(2)} €</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{charge.tariff}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{charge.pricePerKwh.toFixed(4)} €</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">
-                                        {charge.consumptionKwh100km !== null 
-                                          ? <span className="font-semibold text-blue-600 dark:text-blue-400">{charge.consumptionKwh100km.toFixed(2)}</span> 
-                                          : <span className="text-slate-400">-</span>
-                                        }
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">
-                                        {charge.costPer100km !== null 
-                                            ? <span className="font-semibold text-orange-600 dark:text-orange-400">{charge.costPer100km.toFixed(2)} €</span> 
-                                            : <span className="text-slate-400">-</span>
-                                        }
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">
-                                        {charge.gasolineEquivalentKm !== null 
-                                            ? <span className="font-semibold text-green-600 dark:text-green-400">{charge.gasolineEquivalentKm.toLocaleString('fr-FR')} km</span> 
-                                            : <span className="text-slate-400">-</span>
-                                        }
-                                    </td>
-                                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium no-print no-pdf">
-                                        <div className="flex items-center justify-end gap-x-4">
-                                            <button 
-                                                onClick={() => handleSendEmail(charge)} 
-                                                className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-500"
-                                                title="Envoyer le récapitulatif par e-mail"
-                                                aria-label="Envoyer le récapitulatif par e-mail"
-                                            >
-                                                <Mail size={18} />
-                                            </button>
-                                            <button 
-                                                onClick={() => deleteCharge(charge.id)} 
-                                                className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-500"
-                                                title="Supprimer la recharge"
-                                                aria-label="Supprimer la recharge"
-                                            >
-                                               <Trash2 size={18} />
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
                 </div>
             </div>
+            <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                     <thead className="bg-slate-50 dark:bg-slate-700/50">
+                        <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Date</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Kilométrage</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Batterie</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Énergie / Coût</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Tarif</th>
+                             <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Consommation</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Coût trajet</th>
+                            <th scope="col" className="relative px-6 py-3 no-print">
+                                <span className="sr-only">Actions</span>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+                        {paginatedCharges.map(charge => (
+                            <tr key={charge.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-800 dark:text-slate-100">{new Date(charge.date).toLocaleDateString('fr-FR')}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{charge.odometer.toLocaleString('fr-FR')} km</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{charge.startPercentage}% → {charge.endPercentage}%</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">
+                                    <div className="font-semibold text-slate-800 dark:text-slate-100">{charge.kwhAdded.toFixed(2)} kWh</div>
+                                    <div>{charge.cost.toFixed(2)} €</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">
+                                    {charge.tariff}
+                                    <div className="text-xs text-slate-400">{charge.pricePerKwh.toFixed(4)} €/kWh</div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
+                                    {charge.consumptionKwh100km !== null ? (
+                                        <span className="text-blue-600 dark:text-blue-400">{charge.consumptionKwh100km.toFixed(2)} kWh/100km</span>
+                                    ) : <span className="text-slate-400">-</span>}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
+                                     {charge.costPer100km !== null ? (
+                                        <span className="text-orange-600 dark:text-orange-400">{charge.costPer100km.toFixed(2)} €/100km</span>
+                                    ) : <span className="text-slate-400">-</span>}
+                                    {charge.gasolineEquivalentKm != null && <div className="text-xs text-slate-400 font-normal">Équiv. {charge.gasolineEquivalentKm} km</div>}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium no-print">
+                                    <div className="flex items-center justify-end space-x-1">
+                                         <button onClick={() => handleSendEmail(charge)} className="p-2 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Envoyer par e-mail">
+                                            <Mail size={16} />
+                                        </button>
+                                        <button onClick={() => window.confirm('Êtes-vous sûr de vouloir supprimer cette recharge ?') && deleteCharge(charge.id)} className="p-2 text-slate-500 hover:text-red-600 dark:hover:text-red-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Supprimer">
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+             {totalPages > 1 && (
+                <div className="px-6 py-4 flex justify-between items-center border-t border-slate-200 dark:border-slate-700 no-print">
+                    <button
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                    >
+                        <ChevronLeft size={16} />
+                        Précédent
+                    </button>
+                    <span className="text-sm text-slate-500 dark:text-slate-400">
+                        Page {currentPage} sur {totalPages}
+                    </span>
+                    <button
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg disabled:opacity-50 disabled:cursor-not-allowed bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                    >
+                        Suivant
+                        <ChevronRight size={16} />
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

@@ -7,6 +7,8 @@ export interface Vehicle {
 export interface Settings {
   recapEmail: string;
   batteryCapacity: number; // in kWh
+  vehicleModel: string;
+  registrationNumber: string;
   pricePeak: number; // price per kWh
   priceOffPeak: number; // price per kWh
   // Tempo prices
@@ -19,6 +21,10 @@ export interface Settings {
   // Gasoline comparison
   gasolineCarConsumption: number; // in L/100km
   gasolinePricePerLiter: number; // in €/L
+  fiscalPower: number; // in CV
+  // Billing
+  billingRateLocal: number; // in € for short trips
+  billingRateMedium: number; // in € for medium trips
 }
 
 export enum TariffType {
@@ -53,6 +59,49 @@ export interface ProcessedCharge extends Charge {
   costPer100km: number | null;
 }
 
+export interface Trip {
+  id: string;
+  date: string; // ISO string format
+  destination: string;
+  client?: string;
+  startOdometer: number;
+  endOdometer: number;
+  startPercentage: number;
+  endPercentage: number;
+  isBilled: boolean;
+}
+
+export interface ProcessedTrip extends Trip {
+  distance: number;
+  kwhConsumed: number;
+  cost: number;
+  consumptionKwh100km: number;
+  pricePerKwh: number;
+  gasolineEquivalentCost: number;
+  savings: number;
+  billingAmount?: number;
+}
+
+export enum MaintenanceType {
+  LAVAGE = 'Lavage',
+  ENTRETIEN_PERIODIQUE = 'Entretien périodique',
+  REPARATION = 'Réparation',
+  PNEUS = 'Pneus',
+  PARE_BRISE = 'Pare-brise',
+  CARROSSERIE = 'Carrosserie',
+}
+
+export interface MaintenanceEntry {
+  id: string;
+  date: string; // ISO string format
+  odometer: number; // in km
+  type: MaintenanceType;
+  details?: string;
+  cost: number;
+}
+
+export interface ProcessedMaintenanceEntry extends MaintenanceEntry {}
+
 export interface StatsData {
   name: string;
   totalKwh: number;
@@ -63,8 +112,30 @@ export interface StatsData {
   totalGasolineCost: number;
 }
 
+export interface TripStatsData {
+  name: string;
+  totalDistance: number;
+  totalCost: number;
+  totalSavings: number;
+  totalBillingAmount: number;
+}
+
+export interface ClientStats {
+  name: string;
+  tripCount: number;
+  totalDistance: number;
+  totalBillingAmount: number;
+}
+
+export interface DestinationStats {
+  name: string;
+  tripCount: number;
+  totalDistance: number;
+  avgDistance: number;
+}
+
+
 export interface User {
-  id: string; // Firebase UID
-  email: string;
-  isAdmin?: boolean;
+  id: string;
+  name: string;
 }
