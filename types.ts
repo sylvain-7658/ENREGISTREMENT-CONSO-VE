@@ -133,9 +133,3 @@ export interface DestinationStats {
   totalDistance: number;
   avgDistance: number;
 }
-
-
-export interface User {
-  id: string;
-  name: string;
-}

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { TariffType, StatsData } from '../types';
@@ -78,7 +79,7 @@ const SummarySection: React.FC<{
 };
 
 const ChargeList: React.FC = () => {
-    const { charges, settings, currentUser } = useAppContext();
+    const { charges, settings, user } = useAppContext();
     const [period, setPeriod] = useState<Period>('monthly');
     const vehicleInfoText = useMemo(() => {
         if (settings.registrationNumber) {
@@ -131,8 +132,8 @@ const ChargeList: React.FC = () => {
                         Résumés par période
                     </h2>
                      <div className="text-sm text-slate-500 dark:text-slate-400 mt-1 space-x-2">
-                        {currentUser && <span>Profil: <span className="font-semibold text-slate-600 dark:text-slate-300">{currentUser.name}</span></span>}
-                        {currentUser && vehicleInfoText && <span className="text-slate-400">&bull;</span>}
+                        {user && <span>Compte: <span className="font-semibold text-slate-600 dark:text-slate-300">{user.email}</span></span>}
+                        {user && vehicleInfoText && <span className="text-slate-400">&bull;</span>}
                         {vehicleInfoText && <span>Véhicule: <span className="font-semibold text-slate-600 dark:text-slate-300">{vehicleInfoText}</span></span>}
                     </div>
                 </div>

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import Card from './Card';
 import { Settings as SettingsType, Vehicle } from '../types';
-import { Cloud, CloudOff, Mail, Car, Zap, Sun, Leaf, FileText } from 'lucide-react';
+import { Mail, Car, Zap, Sun, Leaf, FileText } from 'lucide-react';
 import Accordion from './Accordion';
 
 const InputGroup = ({ label, id, value, onChange, type = "number", unit, step = "0.01", disabled = false, placeholder = '' }: { 
@@ -43,22 +43,13 @@ const InputGroup = ({ label, id, value, onChange, type = "number", unit, step = 
 );
 
 const Settings: React.FC = () => {
-    const { settings, updateSettings, vehicles, syncConfig, updateSyncConfig, clearSyncConfig } = useAppContext();
+    const { settings, updateSettings, vehicles } = useAppContext();
     const [localSettings, setLocalSettings] = useState<SettingsType>(settings);
     const [isSaved, setIsSaved] = useState(false);
-    const [localSyncUrl, setLocalSyncUrl] = useState('');
-    const [localApiKey, setLocalApiKey] = useState('');
-    const [syncStatus, setSyncStatus] = useState('');
-
 
     useEffect(() => {
         setLocalSettings(settings);
     }, [settings]);
-
-    useEffect(() => {
-        setLocalSyncUrl(syncConfig?.url || '');
-        setLocalApiKey(syncConfig?.apiKey || '');
-    }, [syncConfig]);
 
     const handleChange = (id: keyof SettingsType, value: string | number) => {
         setLocalSettings(prev => ({ ...prev, [id]: value }));
@@ -88,87 +79,10 @@ const Settings: React.FC = () => {
         setTimeout(() => setIsSaved(false), 2500);
     };
 
-    const handleSyncSave = async () => {
-        if (!localSyncUrl.trim() || !localApiKey.trim()) {
-            setSyncStatus('Veuillez remplir l\'URL et la clé API.');
-            return;
-        }
-        setSyncStatus('Test de la connexion...');
-        try {
-            const res = await fetch(localSyncUrl, { headers: { 'X-Master-Key': localApiKey, 'X-Bin-Meta': 'false' } });
-            if (res.ok || res.status === 404) { // 404 is ok for a new bin
-                setSyncStatus('Connexion réussie ! Sauvegarde de la configuration...');
-                updateSyncConfig({ url: localSyncUrl, apiKey: localApiKey });
-                setTimeout(() => setSyncStatus('Synchronisation activée.'), 2000);
-            } else {
-                 setSyncStatus(`Erreur de connexion (${res.status}). Vérifiez l'URL et la clé.`);
-            }
-        } catch (e) {
-            setSyncStatus('Erreur de réseau. Vérifiez l\'URL et votre connexion internet.');
-        }
-    };
-    
-    const handleSyncClear = () => {
-        if (window.confirm("Êtes-vous sûr de vouloir désactiver la synchronisation ? Vos données resteront dans le cloud mais ne seront plus mises à jour depuis cet appareil.")) {
-            clearSyncConfig();
-            setSyncStatus('Synchronisation désactivée.');
-        }
-    };
-
     return (
         <Card>
             <h2 className="text-3xl font-bold mb-6 text-slate-800 dark:text-slate-100">Paramètres</h2>
             <div className="space-y-1">
-                <Accordion title="Synchronisation Cloud" icon={<Cloud size={20} />}>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 mb-4">
-                        Sauvegardez vos données en ligne pour y accéder depuis n'importe quel appareil.
-                        Utilisez un service comme <a href="https://jsonbin.io/" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline font-semibold">jsonbin.io</a> pour obtenir une URL et une clé API.
-                    </p>
-                    <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-900/50 mb-4">
-                        <p className="text-xs text-amber-700 dark:text-amber-400">
-                            <strong>Attention :</strong> La clé d'API sera stockée dans votre navigateur. N'utilisez pas une clé donnant accès à d'autres données sensibles.
-                        </p>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <InputGroup
-                            label="URL du bin de données"
-                            id="syncUrl"
-                            type="text"
-                            value={localSyncUrl}
-                            onChange={(_, value) => setLocalSyncUrl(value as string)}
-                            unit=""
-                            placeholder="https://api.jsonbin.io/v3/b/..."
-                        />
-                        <InputGroup
-                            label="Clé d'API (X-Master-Key)"
-                            id="syncApiKey"
-                            type="password"
-                            value={localApiKey}
-                            onChange={(_, value) => setLocalApiKey(value as string)}
-                            unit=""
-                        />
-                    </div>
-                     <div className="pt-4 flex justify-between items-center gap-4">
-                        <div className="text-sm font-medium">
-                           {syncStatus || (syncConfig ? 
-                                <span className="flex items-center gap-2 text-green-600 dark:text-green-400"><Cloud size={16}/>Connecté</span> :
-                                <span className="flex items-center gap-2 text-slate-500"><CloudOff size={16}/>Déconnecté</span>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                             {syncConfig && 
-                                <button onClick={handleSyncClear} className="px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-lg shadow-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors">
-                                    Déconnecter
-                                </button>
-                            }
-                            <button onClick={handleSyncSave} className="px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-blue-600 hover:bg-blue-700 transition-colors">
-                                {syncConfig ? 'Mettre à jour' : 'Connecter'}
-                            </button>
-                        </div>
-                    </div>
-                </Accordion>
-                
                 <Accordion title="Récapitulatifs par e-mail" icon={<Mail size={20} />}>
                      <InputGroup
                         label="Adresse e-mail de destination"
