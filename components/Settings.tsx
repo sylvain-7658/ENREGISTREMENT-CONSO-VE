@@ -1,14 +1,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import Card from './Card';
 import { Settings as SettingsType, Vehicle } from '../types';
-import { Mail, Car, Zap, Sun, Leaf, FileText } from 'lucide-react';
+import { User, Mail, Car, Zap, Sun, Leaf, FileText, LogOut } from 'lucide-react';
 import Accordion from './Accordion';
 
 const InputGroup = ({ label, id, value, onChange, type = "number", unit, step = "0.01", disabled = false, placeholder = '' }: { 
     label: string;
-    id: keyof SettingsType | 'syncUrl' | 'syncApiKey'; 
+    id: keyof SettingsType; 
     value: string | number; 
     onChange: (id: any, value: string | number) => void; 
     type?: "number" | "email" | "text" | "password"; 
@@ -44,6 +45,7 @@ const InputGroup = ({ label, id, value, onChange, type = "number", unit, step = 
 
 const Settings: React.FC = () => {
     const { settings, updateSettings, vehicles } = useAppContext();
+    const { currentUser, logout } = useAuth();
     const [localSettings, setLocalSettings] = useState<SettingsType>(settings);
     const [isSaved, setIsSaved] = useState(false);
 
@@ -83,6 +85,22 @@ const Settings: React.FC = () => {
         <Card>
             <h2 className="text-3xl font-bold mb-6 text-slate-800 dark:text-slate-100">Paramètres</h2>
             <div className="space-y-1">
+                 <Accordion title="Mon Compte" icon={<User size={20} />} startOpen={true}>
+                    <div className="space-y-4">
+                        <div className="p-4 rounded-lg bg-slate-100 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700">
+                            <p className="text-sm text-slate-500 dark:text-slate-400">Connecté en tant que :</p>
+                            <p className="font-semibold text-lg text-slate-800 dark:text-slate-200 truncate">{currentUser?.email}</p>
+                        </div>
+                        <button 
+                            onClick={logout}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-lg shadow-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                        >
+                            <LogOut size={16} />
+                            Se déconnecter
+                        </button>
+                    </div>
+                </Accordion>
+                
                 <Accordion title="Récapitulatifs par e-mail" icon={<Mail size={20} />}>
                      <InputGroup
                         label="Adresse e-mail de destination"
@@ -94,7 +112,7 @@ const Settings: React.FC = () => {
                     />
                 </Accordion>
                 
-                <Accordion title="Configuration du Véhicule" icon={<Car size={20} />} startOpen={true}>
+                <Accordion title="Configuration du Véhicule" icon={<Car size={20} />} startOpen={false}>
                      <div className="space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <InputGroup

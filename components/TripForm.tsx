@@ -1,7 +1,7 @@
 
-
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { Trip } from '../types';
 import Card from './Card';
 
@@ -17,7 +17,8 @@ const Input = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
 );
 
 const TripForm: React.FC = () => {
-    const { addTrip, user } = useAppContext();
+    const { addTrip } = useAppContext();
+    const { currentUser } = useAuth();
     const today = new Date().toISOString().split('T')[0];
 
     const [date, setDate] = useState(today);
@@ -86,7 +87,7 @@ const TripForm: React.FC = () => {
         <Card>
             <h2 className="text-2xl font-bold mb-6 text-slate-800 dark:text-slate-100 flex items-baseline">
                 <span>Ajouter un trajet</span>
-                 {user && <span className="text-lg font-medium text-slate-500 dark:text-slate-400 ml-3 truncate max-w-xs">pour {user.email}</span>}
+                 {currentUser && <span className="text-lg font-medium text-slate-500 dark:text-slate-400 ml-3 truncate" title={currentUser.email || ''}>pour {currentUser.displayName || currentUser.email}</span>}
             </h2>
             <form onSubmit={handleSubmit} className="space-y-4">
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

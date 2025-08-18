@@ -1,13 +1,14 @@
-
 import React, { createContext, useContext, useMemo, FC, PropsWithChildren, useState, useEffect } from 'react';
 import { Settings, Charge, ProcessedCharge, Vehicle, Trip, ProcessedTrip, MaintenanceEntry, ProcessedMaintenanceEntry } from '../types';
 import { processCharges, processTrips, processMaintenanceEntries } from '../utils/calculations';
 import { vehicles as defaultVehles } from '../data/vehicleData';
-import { auth, db } from '../firebase/config';
-import { User, onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, collection, onSnapshot, addDoc, deleteDoc, setDoc, WithFieldValue, QueryDocumentSnapshot, DocumentData, FirestoreError } from 'firebase/firestore';
+import { useAuth } from './AuthContext';
+import { db } from '../firebase/config';
 
-export type ConnectionStatus = 'ONLINE' | 'OFFLINE' | 'ERROR';
+export type NotificationType = {
+  message: string;
+  type: 'warning' | 'success';
+}
 
 interface AppContextType {
   settings: Settings;
@@ -24,11 +25,10 @@ interface AppContextType {
   addMaintenanceEntry: (entry: Omit<MaintenanceEntry, 'id'>) => void;
   deleteMaintenanceEntry: (id: string) => void;
   vehicles: Vehicle[];
-  user: User | null; // Firebase User
   isLoading: boolean;
-  connectionStatus: ConnectionStatus;
-  connectionMessage: string;
-  logout: () => Promise<void>;
+  isOnline: boolean;
+  notification: NotificationType | null;
+  setNotification: React.Dispatch<React.SetStateAction<NotificationType | null>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -57,184 +57,196 @@ const EMPTY_CHARGES: Charge[] = [];
 const EMPTY_TRIPS: Trip[] = [];
 const EMPTY_MAINTENANCE: MaintenanceEntry[] = [];
 
-const fromFirestore = <T extends { id: string }>(doc: QueryDocumentSnapshot<DocumentData>): T => {
-    const data = doc.data();
-    return {
-        id: doc.id,
-        ...data,
-    } as T;
-};
-
 export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const { currentUser } = useAuth();
   const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [rawCharges, setRawCharges] = useState<Charge[]>(EMPTY_CHARGES);
   const [rawTrips, setRawTrips] = useState<Trip[]>(EMPTY_TRIPS);
   const [rawMaintenance, setRawMaintenance] = useState<MaintenanceEntry[]>(EMPTY_MAINTENANCE);
   const [isLoading, setIsLoading] = useState(true);
   const [vehicles] = useState<Vehicle[]>(defaultVehles);
-  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>('ONLINE');
-  const [connectionMessage, setConnectionMessage] = useState('');
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [notification, setNotification] = useState<NotificationType | null>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      setIsLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
+    const handleOnline = () => {
+      setIsOnline(true);
+      setNotification({ message: 'Connexion rétablie !', type: 'success' });
+      setTimeout(() => {
+        setNotification(currentNotif => (currentNotif?.type === 'success' ? null : currentNotif));
+      }, 3000);
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      setNotification({ message: "Connexion perdue. Vous êtes en mode hors ligne.", type: 'warning' });
+    };
 
-  useEffect(() => {
-    if (!user) {
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    if (!currentUser) {
       setSettings(defaultSettings);
       setRawCharges(EMPTY_CHARGES);
       setRawTrips(EMPTY_TRIPS);
       setRawMaintenance(EMPTY_MAINTENANCE);
-      return;
+      setIsLoading(false);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
     }
 
-    const handleError = (error: FirestoreError) => {
-        console.error("Firestore Error:", error);
-        if (error.code === 'unavailable') {
-            if (connectionStatus !== 'OFFLINE') {
-                setConnectionStatus('OFFLINE');
-                setConnectionMessage("Connexion à la base de données impossible. L'application est en mode hors ligne.");
-            }
+    setIsLoading(true);
+    const userId = currentUser.uid;
+
+    const userDocRef = db.collection('users').doc(userId);
+    const chargesColRef = userDocRef.collection('charges');
+    const tripsColRef = userDocRef.collection('trips');
+    const maintenanceColRef = userDocRef.collection('maintenance');
+
+    const unsubscribes = [
+      userDocRef.onSnapshot((docSnap) => {
+        if (docSnap.exists) {
+          setSettings({ ...defaultSettings, ...(docSnap.data() as Partial<Settings>) });
         } else {
-            if (connectionStatus !== 'ERROR') {
-                setConnectionStatus('ERROR');
-                setConnectionMessage(`Erreur de base de données (${error.code}). Vérifiez la configuration de votre projet Firebase.`);
-            }
+          userDocRef.set(defaultSettings);
+          setSettings(defaultSettings);
         }
-    };
+      }),
+      chargesColRef.onSnapshot((snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Charge));
+        setRawCharges(data);
+      }),
+      tripsColRef.onSnapshot((snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
+        setRawTrips(data);
+      }),
+      maintenanceColRef.onSnapshot((snapshot) => {
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceEntry));
+        setRawMaintenance(data);
+      }),
+    ];
     
-    const handleSuccess = () => {
-        if (connectionStatus !== 'ONLINE') {
-            setConnectionStatus('ONLINE');
-            setConnectionMessage("");
-        }
-    };
-
-    const userDocRef = doc(db, 'users', user.uid);
-    const settingsDocRef = doc(userDocRef, 'data', 'settings');
-    
-    const unsubSettings = onSnapshot(settingsDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setSettings({ ...defaultSettings, ...docSnap.data() });
-      } else {
-        setDoc(settingsDocRef, defaultSettings, { merge: true });
-        setSettings(defaultSettings);
-      }
-      handleSuccess();
-    }, handleError);
-
-    const chargesColRef = collection(userDocRef, 'charges');
-    const unsubCharges = onSnapshot(chargesColRef, (snapshot) => {
-      setRawCharges(snapshot.docs.map(d => fromFirestore<Charge>(d)));
-      handleSuccess();
-    }, handleError);
-
-    const tripsColRef = collection(userDocRef, 'trips');
-    const unsubTrips = onSnapshot(tripsColRef, (snapshot) => {
-      setRawTrips(snapshot.docs.map(d => fromFirestore<Trip>(d)));
-      handleSuccess();
-    }, handleError);
-
-    const maintenanceColRef = collection(userDocRef, 'maintenance');
-    const unsubMaintenance = onSnapshot(maintenanceColRef, (snapshot) => {
-      setRawMaintenance(snapshot.docs.map(d => fromFirestore<MaintenanceEntry>(d)));
-      handleSuccess();
-    }, handleError);
+    // Consider data loaded once listeners are attached.
+    // For a better UX, one could use a counter or Promise.all if we were doing one-time fetches.
+    // With listeners, this is a reasonable approach.
+    setIsLoading(false);
 
     return () => {
-      unsubSettings();
-      unsubCharges();
-      unsubTrips();
-      unsubMaintenance();
+        unsubscribes.forEach(unsub => unsub());
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
     };
-  }, [user, connectionStatus]);
+  }, [currentUser]);
 
   const updateSettings = async (newSettingsPart: Partial<Settings>) => {
-    if (!user) return;
-    const settingsDocRef = doc(db, 'users', user.uid, 'data', 'settings');
-    await setDoc(settingsDocRef, newSettingsPart, { merge: true });
+    if (!currentUser) return;
+    const userDocRef = db.collection('users').doc(currentUser.uid);
+    await userDocRef.set(newSettingsPart, { merge: true });
   };
   
   const addCharge = async (chargeData: Omit<Charge, 'id'>) => {
-    if (!user) return;
-    const chargesColRef = collection(db, 'users', user.uid, 'charges');
-    await addDoc(chargesColRef, chargeData as WithFieldValue<Omit<Charge, 'id'>>);
+    if (!currentUser) return;
+    const chargesColRef = db.collection('users').doc(currentUser.uid).collection('charges');
+    await chargesColRef.add(chargeData);
   };
   
   const deleteCharge = async (id: string) => {
-    if (!user) return;
-    const chargeDocRef = doc(db, 'users', user.uid, 'charges', id);
-    await deleteDoc(chargeDocRef);
+    if (!currentUser) return;
+    const chargeDocRef = db.collection('users').doc(currentUser.uid).collection('charges').doc(id);
+    await chargeDocRef.delete();
   }
 
   const importCharges = async (chargesToImport: Omit<Charge, 'id'>[]): Promise<{ addedCount: number; skippedCount: number }> => {
-    const existingOdometerSet = new Set(rawCharges.map(c => c.odometer));
-    let addedCount = 0;
+    if (!currentUser) return { addedCount: 0, skippedCount: 0 };
     
+    const chargesColRef = db.collection('users').doc(currentUser.uid).collection('charges');
+    const querySnapshot = await chargesColRef.get();
+    const existingOdometerSet = new Set(querySnapshot.docs.map(doc => doc.data().odometer));
+
+    const uniqueNewCharges: Omit<Charge, 'id'>[] = [];
+    let skippedCount = 0;
+
     for (const newCharge of chargesToImport) {
         if (!existingOdometerSet.has(newCharge.odometer)) {
-            await addCharge(newCharge);
+            uniqueNewCharges.push(newCharge);
             existingOdometerSet.add(newCharge.odometer);
-            addedCount++;
+        } else {
+          skippedCount++;
         }
     }
     
-    return { addedCount, skippedCount: chargesToImport.length - addedCount };
+    if (uniqueNewCharges.length > 0) {
+      const batch = db.batch();
+      uniqueNewCharges.forEach(charge => {
+        const newDocRef = chargesColRef.doc();
+        batch.set(newDocRef, charge);
+      });
+      await batch.commit();
+    }
+    
+    return { addedCount: uniqueNewCharges.length, skippedCount };
   };
 
   const addTrip = async (tripData: Omit<Trip, 'id'>) => {
-    if (!user) return;
-    const tripsColRef = collection(db, 'users', user.uid, 'trips');
-    await addDoc(tripsColRef, tripData as WithFieldValue<Omit<Trip, 'id'>>);
+    if (!currentUser) return;
+    const tripsColRef = db.collection('users').doc(currentUser.uid).collection('trips');
+    await tripsColRef.add(tripData);
   };
 
   const deleteTrip = async (id: string) => {
-    if (!user) return;
-    const tripDocRef = doc(db, 'users', user.uid, 'trips', id);
-    await deleteDoc(tripDocRef);
+    if (!currentUser) return;
+    const tripDocRef = db.collection('users').doc(currentUser.uid).collection('trips').doc(id);
+    await tripDocRef.delete();
   };
 
   const importTrips = async (tripsToImport: Omit<Trip, 'id'>[]): Promise<{ addedCount: number; skippedCount: number }> => {
-    const existingTripSet = new Set(rawTrips.map(t => `${t.date}-${t.startOdometer}`));
-    let addedCount = 0;
+    if (!currentUser) return { addedCount: 0, skippedCount: 0 };
+
+    const tripsColRef = db.collection('users').doc(currentUser.uid).collection('trips');
+    const querySnapshot = await tripsColRef.get();
+    const existingTripSet = new Set(querySnapshot.docs.map(d => `${d.data().date}-${d.data().startOdometer}`));
+    
+    const uniqueNewTrips: Omit<Trip, 'id'>[] = [];
+    let skippedCount = 0;
 
     for (const newTrip of tripsToImport) {
         const tripKey = `${newTrip.date}-${newTrip.startOdometer}`;
         if (!existingTripSet.has(tripKey)) {
-            await addTrip(newTrip);
+            uniqueNewTrips.push(newTrip);
             existingTripSet.add(tripKey);
-            addedCount++;
+        } else {
+          skippedCount++;
         }
     }
     
-    return { addedCount, skippedCount: tripsToImport.length - addedCount };
+    if (uniqueNewTrips.length > 0) {
+      const batch = db.batch();
+      uniqueNewTrips.forEach(trip => {
+        const newDocRef = tripsColRef.doc();
+        batch.set(newDocRef, trip);
+      });
+      await batch.commit();
+    }
+    
+    return { addedCount: uniqueNewTrips.length, skippedCount };
   };
 
   const addMaintenanceEntry = async (entryData: Omit<MaintenanceEntry, 'id'>) => {
-    if (!user) return;
-    const maintenanceColRef = collection(db, 'users', user.uid, 'maintenance');
-    await addDoc(maintenanceColRef, entryData as WithFieldValue<Omit<MaintenanceEntry, 'id'>>);
+    if (!currentUser) return;
+    const maintenanceColRef = db.collection('users').doc(currentUser.uid).collection('maintenance');
+    await maintenanceColRef.add(entryData);
   };
 
   const deleteMaintenanceEntry = async (id: string) => {
-    if (!user) return;
-    const maintenanceDocRef = doc(db, 'users', user.uid, 'maintenance', id);
-    await deleteDoc(maintenanceDocRef);
-  };
-
-  const logout = async () => {
-    await signOut(auth);
+    if (!currentUser) return;
+    const maintenanceDocRef = db.collection('users').doc(currentUser.uid).collection('maintenance').doc(id);
+    await maintenanceDocRef.delete();
   };
 
   const processedCharges = useMemo(() => processCharges(rawCharges, settings), [rawCharges, settings]);
   const processedTrips = useMemo(() => {
-    const lastCharge = processedCharges.length > 0 ? processedCharges[processedCharges.length - 1] : undefined;
-    return processTrips(rawTrips, settings, lastCharge);
+    return processTrips(rawTrips, settings, processedCharges);
   }, [rawTrips, settings, processedCharges]);
   const processedMaintenanceEntries = useMemo(() => processMaintenanceEntries(rawMaintenance), [rawMaintenance]);
 
@@ -253,11 +265,10 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
     addMaintenanceEntry,
     deleteMaintenanceEntry,
     vehicles,
-    user,
     isLoading,
-    connectionStatus,
-    connectionMessage,
-    logout,
+    isOnline,
+    notification,
+    setNotification,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

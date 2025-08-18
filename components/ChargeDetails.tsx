@@ -1,6 +1,6 @@
-
 import React, { useRef, useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { Trash2, Download, Upload, Mail, FileDown, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -10,7 +10,8 @@ import { Charge, ProcessedCharge, TariffType } from '../types';
 const ITEMS_PER_PAGE = 10;
 
 const ChargeDetails: React.FC = () => {
-    const { charges, deleteCharge, importCharges, settings, user } = useAppContext();
+    const { charges, deleteCharge, importCharges, settings } = useAppContext();
+    const { currentUser } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isExportingPdf, setIsExportingPdf] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -298,8 +299,8 @@ Votre application Suivi Conso EV
                         Détail des recharges
                     </h2>
                      <div className="text-sm text-slate-500 dark:text-slate-400 mt-1 space-x-2">
-                        {user && <span>Compte: <span className="font-semibold text-slate-600 dark:text-slate-300">{user.email}</span></span>}
-                        {user && vehicleInfoText && <span className="text-slate-400">&bull;</span>}
+                        {currentUser && <span>Compte: <span className="font-semibold text-slate-600 dark:text-slate-300">{currentUser.displayName || currentUser.email}</span></span>}
+                        {currentUser && vehicleInfoText && <span className="text-slate-400">&bull;</span>}
                         {vehicleInfoText && <span>Véhicule: <span className="font-semibold text-slate-600 dark:text-slate-300">{vehicleInfoText}</span></span>}
                     </div>
                 </div>

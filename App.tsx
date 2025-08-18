@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect } from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import ChargeJournal from './components/ChargeJournal';
@@ -7,9 +9,12 @@ import Stats from './components/Stats';
 import Dashboard from './components/Dashboard';
 import TripJournal from './components/TripJournal';
 import MaintenanceJournal from './components/MaintenanceJournal';
-import { BarChart2, BookOpen, Settings as SettingsIcon, LayoutDashboard, MapPin, Wrench } from 'lucide-react';
-import Auth from './components/Auth';
-import AuthControl from './components/AuthControl';
+import { BarChart2, BookOpen, Settings as SettingsIcon, LayoutDashboard, MapPin, Wrench, LogOut } from 'lucide-react';
+import SkeletonLoader from './components/SkeletonLoader';
+import { useAuth } from './context/AuthContext';
+import Login from './components/auth/Login';
+import Notification from './components/Notification';
+import { AnimatePresence } from 'framer-motion';
 
 export type View = 'dashboard' | 'journal' | 'trajets' | 'entretien' | 'stats' | 'settings';
 
@@ -41,35 +46,18 @@ const MobileNavItem = ({ label, icon: Icon, isActive, onClick }: { label: string
     </button>
 );
 
-
 const AppContent: React.FC = () => {
     const [activeView, setActiveView] = useState<View>('dashboard');
-    const { isLoading, user, connectionStatus, connectionMessage } = useAppContext();
+    const { isLoading, notification, setNotification } = useAppContext();
+    const { currentUser, logout } = useAuth();
 
     if (isLoading) {
-        return (
-            <div className="flex items-center justify-center h-screen bg-slate-100 dark:bg-slate-900">
-                <div className="text-slate-500 dark:text-slate-400">Chargement...</div>
-            </div>
-        );
-    }
-
-    if (!user) {
-        return <Auth />;
+        return <SkeletonLoader />;
     }
 
     return (
         <div className="min-h-screen bg-slate-100 dark:bg-slate-900 font-sans pb-20 sm:pb-0">
-            {connectionStatus !== 'ONLINE' && (
-                <div className={`text-center p-2 font-semibold text-sm sticky top-0 z-50 no-print ${
-                    connectionStatus === 'OFFLINE' 
-                        ? 'bg-yellow-500 text-yellow-900' 
-                        : 'bg-red-500 text-white'
-                }`}>
-                    {connectionMessage}
-                </div>
-            )}
-            <header className={`bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg shadow-sm sticky z-10 no-print transition-all duration-300 ${connectionStatus !== 'ONLINE' ? 'top-[36px]' : 'top-0'}`}>
+            <header className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg shadow-sm sticky top-0 z-10 no-print">
                 <div className="container mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center h-16">
                         <div className="flex items-center gap-2 sm:gap-4">
@@ -77,21 +65,30 @@ const AppContent: React.FC = () => {
                                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-blue-600 dark:text-blue-400">
                                     <path d="M13 3V9H18L10 21V15H5L13 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
-                                <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 hidden sm:block">
+                                <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">
                                     Suivi EV
                                 </h1>
                             </div>
                         </div>
-                        <div className="flex items-center gap-4">
-                            <div className="hidden sm:flex items-center space-x-2">
-                                <NavItem label="Tableau de bord" icon={LayoutDashboard} isActive={activeView === 'dashboard'} onClick={() => setActiveView('dashboard')} />
-                                <NavItem label="Journal" icon={BookOpen} isActive={activeView === 'journal'} onClick={() => setActiveView('journal')} />
-                                <NavItem label="Trajets" icon={MapPin} isActive={activeView === 'trajets'} onClick={() => setActiveView('trajets')} />
-                                <NavItem label="Entretien" icon={Wrench} isActive={activeView === 'entretien'} onClick={() => setActiveView('entretien')} />
-                                <NavItem label="Statistiques" icon={BarChart2} isActive={activeView === 'stats'} onClick={() => setActiveView('stats')} />
-                                <NavItem label="Paramètres" icon={SettingsIcon} isActive={activeView === 'settings'} onClick={() => setActiveView('settings')} />
-                            </div>
-                            <AuthControl />
+                        <nav className="hidden sm:flex items-center space-x-2">
+                            <NavItem label="Tableau de bord" icon={LayoutDashboard} isActive={activeView === 'dashboard'} onClick={() => setActiveView('dashboard')} />
+                            <NavItem label="Journal" icon={BookOpen} isActive={activeView === 'journal'} onClick={() => setActiveView('journal')} />
+                            <NavItem label="Trajets" icon={MapPin} isActive={activeView === 'trajets'} onClick={() => setActiveView('trajets')} />
+                            <NavItem label="Entretien" icon={Wrench} isActive={activeView === 'entretien'} onClick={() => setActiveView('entretien')} />
+                            <NavItem label="Statistiques" icon={BarChart2} isActive={activeView === 'stats'} onClick={() => setActiveView('stats')} />
+                            <NavItem label="Paramètres" icon={SettingsIcon} isActive={activeView === 'settings'} onClick={() => setActiveView('settings')} />
+                        </nav>
+                         <div className="flex items-center gap-4">
+                            <span className="text-sm font-medium text-slate-600 dark:text-slate-300 hidden md:block truncate max-w-xs" title={currentUser?.email || ''}>
+                                {currentUser?.email}
+                            </span>
+                            <button
+                                onClick={logout}
+                                title="Se déconnecter"
+                                className="p-2 rounded-lg transition-colors duration-200 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                            >
+                                <LogOut size={18} />
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -115,12 +112,24 @@ const AppContent: React.FC = () => {
                 <MobileNavItem label="Stats" icon={BarChart2} isActive={activeView === 'stats'} onClick={() => setActiveView('stats')} />
                 <MobileNavItem label="Paramètres" icon={SettingsIcon} isActive={activeView === 'settings'} onClick={() => setActiveView('settings')} />
             </nav>
+
+            <AnimatePresence>
+                {notification && (
+                    <Notification
+                        message={notification.message}
+                        type={notification.type}
+                        onClose={() => setNotification(null)}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 };
 
 
 const App: React.FC = () => {
+    const { currentUser, loading } = useAuth();
+    
      useEffect(() => {
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
@@ -132,11 +141,21 @@ const App: React.FC = () => {
             });
         }
     }, []);
+    
+    if (loading) {
+        return <SkeletonLoader />;
+    }
 
     return (
-        <AppProvider>
-            <AppContent />
-        </AppProvider>
+        <>
+            {currentUser ? (
+                <AppProvider>
+                    <AppContent />
+                </AppProvider>
+            ) : (
+                <Login />
+            )}
+        </>
     );
 };
 

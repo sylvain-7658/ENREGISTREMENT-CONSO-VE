@@ -185,12 +185,14 @@ export const generateTripStats = (trips: ProcessedTrip[], period: 'weekly' | 'mo
 };
 
 
-export const processTrips = (trips: Trip[], settings: Settings, lastCharge: ProcessedCharge | undefined): ProcessedTrip[] => {
+export const processTrips = (trips: Trip[], settings: Settings, charges: ProcessedCharge[]): ProcessedTrip[] => {
   const sortedTrips = [...trips].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.endOdometer - a.endOdometer);
-  
-  const pricePerKwh = lastCharge?.pricePerKwh || 0;
+  const sortedChargesByOdo = [...charges].sort((a, b) => a.odometer - b.odometer);
 
   return sortedTrips.map(trip => {
+    const relevantCharge = sortedChargesByOdo.filter(c => c.odometer <= trip.startOdometer).pop();
+    const pricePerKwh = relevantCharge?.pricePerKwh || 0;
+
     const distance = trip.endOdometer - trip.startOdometer;
     if (distance <= 0) {
       return {

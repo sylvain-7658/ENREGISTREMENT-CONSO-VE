@@ -1,7 +1,7 @@
 
-
 import React, { useRef, useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { Trash2, MapPin, Mail, Upload, Download, FileDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ProcessedTrip, Trip } from '../types';
 import * as XLSX from 'xlsx';
@@ -11,7 +11,8 @@ import html2canvas from 'html2canvas';
 const ITEMS_PER_PAGE = 10;
 
 const TripList: React.FC = () => {
-    const { trips, deleteTrip, settings, user, importTrips } = useAppContext();
+    const { trips, deleteTrip, settings, importTrips } = useAppContext();
+    const { currentUser } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isExportingPdf, setIsExportingPdf] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -27,7 +28,7 @@ const TripList: React.FC = () => {
             alert("Veuillez configurer une adresse e-mail valide dans les Paramètres pour envoyer une facture.");
             return;
         }
-        if (!user) {
+        if (!currentUser) {
             alert("Utilisateur non trouvé.");
             return;
         }
@@ -53,7 +54,7 @@ Montant de la facturation :
 - Total : ${trip.billingAmount?.toFixed(2)} €
 
 Cordialement,
-${user.email}
+${currentUser.displayName || currentUser.email}
         `.trim().replace(/^\s+/gm, '');
 
         const mailtoLink = `mailto:${settings.recapEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
