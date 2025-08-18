@@ -106,9 +106,12 @@ const Dashboard: React.FC<{ setActiveView: (view: View) => void }> = ({ setActiv
     
     return (
         <div className="space-y-8">
-            <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">
-                Tableau de bord
-            </h1>
+            <div>
+                <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">
+                    Tableau de bord
+                </h1>
+                {vehicleInfoText && <p className="text-md text-slate-500 dark:text-slate-400 mt-1">{vehicleInfoText}</p>}
+            </div>
 
             {/* Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -159,7 +162,6 @@ const Dashboard: React.FC<{ setActiveView: (view: View) => void }> = ({ setActiv
                 <div className="lg:col-span-2">
                     <Card>
                         <h2 className="text-xl font-bold">Dépenses des 6 derniers mois</h2>
-                        {vehicleInfoText && <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-4">{vehicleInfoText}</p>}
                         <div style={{ width: '100%', height: 300 }}>
                             <ResponsiveContainer>
                                 <BarChart data={monthlyStats} margin={{ top: 20, right: 20, left: -10, bottom: 5 }}>
