@@ -131,15 +131,33 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
           }
         }),
         chargesColRef.onSnapshot((snapshot) => {
-          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Charge));
+          const data = snapshot.docs.map(doc => {
+            const docData = doc.data();
+            if (docData.date && typeof docData.date.toDate === 'function') {
+                docData.date = docData.date.toDate().toISOString();
+            }
+            return ({ id: doc.id, ...docData } as Charge);
+          });
           setRawCharges(data);
         }),
         tripsColRef.onSnapshot((snapshot) => {
-          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
+          const data = snapshot.docs.map(doc => {
+            const docData = doc.data();
+            if (docData.date && typeof docData.date.toDate === 'function') {
+                docData.date = docData.date.toDate().toISOString();
+            }
+            return ({ id: doc.id, ...docData } as Trip);
+          });
           setRawTrips(data);
         }),
         maintenanceColRef.onSnapshot((snapshot) => {
-          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceEntry));
+          const data = snapshot.docs.map(doc => {
+            const docData = doc.data();
+            if (docData.date && typeof docData.date.toDate === 'function') {
+                docData.date = docData.date.toDate().toISOString();
+            }
+            return ({ id: doc.id, ...docData } as MaintenanceEntry);
+          });
           setRawMaintenance(data);
         }),
       ];
