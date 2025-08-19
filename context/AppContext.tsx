@@ -21,9 +21,12 @@ interface AppContextType {
   startCharge: (charge: Omit<Charge, 'id' | 'status' | 'endPercentage' | 'tariff' | 'customPrice'>) => void;
   completeCharge: (chargeId: string, completionData: { endPercentage: number; tariff: TariffType; customPrice?: number; }) => void;
   trips: ProcessedTrip[];
-  addTrip: (trip: Omit<Trip, 'id'>) => void;
+  addTrip: (trip: Omit<Trip, 'id' | 'status'>) => void;
   deleteTrip: (id: string) => void;
   importTrips: (trips: Omit<Trip, 'id'>[]) => Promise<{ addedCount: number; skippedCount: number }>;
+  pendingTrips: Trip[];
+  startTrip: (trip: Omit<Trip, 'id' | 'status' | 'endOdometer' | 'endPercentage'>) => void;
+  completeTrip: (tripId: string, completionData: { endOdometer: number; endPercentage: number; }) => void;
   maintenanceEntries: ProcessedMaintenanceEntry[];
   addMaintenanceEntry: (entry: Omit<MaintenanceEntry, 'id'>) => void;
   deleteMaintenanceEntry: (id: string) => void;
@@ -238,11 +241,24 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
     return { addedCount: uniqueNewCharges.length, skippedCount };
   };
 
-  const addTrip = async (tripData: Omit<Trip, 'id'>) => {
+  const addTrip = async (tripData: Omit<Trip, 'id' | 'status'>) => {
     if (!currentUser) return;
     const tripsColRef = db.collection('users').doc(currentUser.uid).collection('trips');
-    await tripsColRef.add(tripData);
+    await tripsColRef.add({ ...tripData, status: 'completed' });
     setActiveView('trajets');
+  };
+
+  const startTrip = async (tripData: Omit<Trip, 'id' | 'status' | 'endOdometer' | 'endPercentage'>) => {
+    if (!currentUser) return;
+    const tripsColRef = db.collection('users').doc(currentUser.uid).collection('trips');
+    await tripsColRef.add({ ...tripData, status: 'pending' });
+    setActiveView('dashboard');
+  };
+
+  const completeTrip = async (tripId: string, completionData: { endOdometer: number; endPercentage: number; }) => {
+    if (!currentUser) return;
+    const tripDocRef = db.collection('users').doc(currentUser.uid).collection('trips').doc(tripId);
+    await tripDocRef.update({ ...completionData, status: 'completed' });
   };
 
   const deleteTrip = async (id: string) => {
@@ -275,7 +291,7 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
       const batch = db.batch();
       uniqueNewTrips.forEach(trip => {
         const newDocRef = tripsColRef.doc();
-        batch.set(newDocRef, trip);
+        batch.set(newDocRef, { ...trip, status: 'completed' });
       });
       await batch.commit();
     }
@@ -298,6 +314,8 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
 
   const pendingCharges = useMemo(() => rawCharges.filter(c => c.status === 'pending').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [rawCharges]);
   const completedCharges = useMemo(() => rawCharges.filter(c => c.status === 'completed'), [rawCharges]);
+  
+  const pendingTrips = useMemo(() => rawTrips.filter(t => t.status === 'pending').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [rawTrips]);
 
   const processedCharges = useMemo(() => processCharges(completedCharges, settings), [completedCharges, settings]);
   const processedTrips = useMemo(() => {
@@ -319,6 +337,9 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
     addTrip,
     deleteTrip,
     importTrips,
+    pendingTrips,
+    startTrip,
+    completeTrip,
     maintenanceEntries: processedMaintenanceEntries,
     addMaintenanceEntry,
     deleteMaintenanceEntry,

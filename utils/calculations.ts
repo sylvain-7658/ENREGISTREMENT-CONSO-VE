@@ -235,7 +235,12 @@ export const generateTripStats = (trips: ProcessedTrip[], period: 'weekly' | 'mo
 
 
 export const processTrips = (trips: Trip[], settings: Settings, charges: ProcessedCharge[]): ProcessedTrip[] => {
-  const sortedTrips = [...trips].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.endOdometer - a.endOdometer);
+  const completedTrips = trips.filter(
+    (t): t is Trip & { endOdometer: number; endPercentage: number } =>
+      t.status === 'completed' && t.endOdometer != null && t.endPercentage != null
+  );
+
+  const sortedTrips = [...completedTrips].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.endOdometer - a.endOdometer);
   const sortedChargesByOdo = [...charges].sort((a, b) => a.odometer - b.odometer);
 
   return sortedTrips.map(trip => {

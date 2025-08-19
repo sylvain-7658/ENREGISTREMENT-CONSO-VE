@@ -1,10 +1,11 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import Card from './Card';
 import { Settings as SettingsType, Vehicle } from '../types';
-import { User, Mail, Car, Zap, Sun, Leaf, FileText, LogOut } from 'lucide-react';
+import { User, Mail, Car, Zap, Sun, Leaf, FileText, LogOut, DownloadCloud, Smartphone } from 'lucide-react';
 import Accordion from './Accordion';
 
 const InputGroup = ({ label, id, value, onChange, type = "number", unit, step = "0.01", disabled = false, placeholder = '' }: { 
@@ -48,10 +49,37 @@ const Settings: React.FC = () => {
     const { currentUser, logout } = useAuth();
     const [localSettings, setLocalSettings] = useState<SettingsType>(settings);
     const [isSaved, setIsSaved] = useState(false);
+    const [installPromptEvent, setInstallPromptEvent] = useState<any>(null);
+
+    useEffect(() => {
+        const handleBeforeInstallPrompt = (e: Event) => {
+            e.preventDefault();
+            setInstallPromptEvent(e);
+        };
+
+        window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+        return () => {
+            window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+        };
+    }, []);
 
     useEffect(() => {
         setLocalSettings(settings);
     }, [settings]);
+
+    const handleInstallClick = async () => {
+        if (!installPromptEvent) return;
+
+        installPromptEvent.prompt();
+        const { outcome } = await installPromptEvent.userChoice;
+        if (outcome === 'accepted') {
+            console.log('User accepted the A2HS prompt');
+        } else {
+            console.log('User dismissed the A2HS prompt');
+        }
+        setInstallPromptEvent(null);
+    };
 
     const handleChange = (id: keyof SettingsType, value: string | number) => {
         setLocalSettings(prev => ({ ...prev, [id]: value }));
@@ -101,6 +129,27 @@ const Settings: React.FC = () => {
                     </div>
                 </Accordion>
                 
+                 <Accordion title="Application" icon={<Smartphone size={20} />}>
+                     <div className="space-y-4">
+                        <p className="text-sm text-slate-600 dark:text-slate-400">
+                            Installez cette application sur votre écran d'accueil pour un accès rapide et une expérience hors ligne, comme une application native.
+                        </p>
+                        {installPromptEvent ? (
+                            <button
+                                onClick={handleInstallClick}
+                                className="w-full flex items-center justify-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 transition-colors"
+                            >
+                                <DownloadCloud size={16} />
+                                Installer l'application sur votre appareil
+                            </button>
+                        ) : (
+                             <p className="text-sm font-medium text-green-600 dark:text-green-400">
+                                L'application est déjà installée ou votre navigateur ne supporte pas cette fonctionnalité.
+                            </p>
+                        )}
+                    </div>
+                </Accordion>
+
                 <Accordion title="Récapitulatifs par e-mail" icon={<Mail size={20} />}>
                      <InputGroup
                         label="Adresse e-mail de destination"

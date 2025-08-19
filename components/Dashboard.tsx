@@ -7,6 +7,7 @@ import { View } from '../types';
 import { ArrowRight, BarChart3, Euro, Gauge, PlusCircle, Settings, History, Leaf, Wrench, MapPin, Zap, Route } from 'lucide-react';
 import { TariffType } from '../types';
 import PendingCharges from './PendingCharges';
+import PendingTrips from './PendingTrips';
 
 const TARIFF_COLORS: { [key in TariffType]: string } = {
     [TariffType.PEAK]: '#f97316', // orange-500
@@ -236,6 +237,7 @@ const Dashboard: React.FC = () => {
         return (
             <div className="space-y-8">
                  <PendingCharges />
+                 <PendingTrips />
                  <div className="text-center bg-white dark:bg-slate-800 p-8 rounded-xl shadow-md border border-slate-200/80 dark:border-slate-700/80">
                      <div className="flex justify-center items-center">
                         <div className="relative">
@@ -273,6 +275,7 @@ const Dashboard: React.FC = () => {
     return (
         <div className="space-y-8">
             <PendingCharges />
+            <PendingTrips />
 
             <div className="flex items-baseline gap-x-3 flex-wrap">
                 <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-100">

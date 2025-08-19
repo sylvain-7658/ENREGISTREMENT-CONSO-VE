@@ -1,4 +1,5 @@
 
+
 import React, { useRef, useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -223,6 +224,7 @@ ${currentUser.displayName || currentUser.email}
                     startPercentage: startPercNum,
                     endPercentage: endPercNum,
                     isBilled,
+                    status: 'completed',
                 };
 
                 if (client) {

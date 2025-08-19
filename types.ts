@@ -72,13 +72,16 @@ export interface Trip {
   destination: string;
   client?: string;
   startOdometer: number;
-  endOdometer: number;
+  endOdometer?: number;
   startPercentage: number;
-  endPercentage: number;
+  endPercentage?: number;
   isBilled: boolean;
+  status: 'pending' | 'completed';
 }
 
 export interface ProcessedTrip extends Trip {
+  endOdometer: number;
+  endPercentage: number;
   distance: number;
   kwhConsumed: number;
   cost: number;
