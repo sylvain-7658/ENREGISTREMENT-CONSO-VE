@@ -1,9 +1,9 @@
 import React, { createContext, useContext, useMemo, FC, PropsWithChildren, useState, useEffect } from 'react';
-import { Settings, Charge, ProcessedCharge, Vehicle, Trip, ProcessedTrip, MaintenanceEntry, ProcessedMaintenanceEntry } from '../types';
+import { Settings, Charge, ProcessedCharge, Vehicle, Trip, ProcessedTrip, MaintenanceEntry, ProcessedMaintenanceEntry, View, TariffType } from '../types';
 import { processCharges, processTrips, processMaintenanceEntries } from '../utils/calculations';
 import { vehicles as defaultVehles } from '../data/vehicleData';
 import { useAuth } from './AuthContext';
-import { db } from '../firebase/config';
+import { db, firestorePromise } from '../firebase/config';
 
 export type NotificationType = {
   message: string;
@@ -14,9 +14,12 @@ interface AppContextType {
   settings: Settings;
   updateSettings: (newSettings: Partial<Settings>) => void;
   charges: ProcessedCharge[];
-  addCharge: (charge: Omit<Charge, 'id'>) => void;
+  addCharge: (charge: Omit<Charge, 'id' | 'status'>) => void;
   deleteCharge: (id: string) => void;
   importCharges: (charges: Omit<Charge, 'id'>[]) => Promise<{ addedCount: number; skippedCount: number }>;
+  pendingCharges: Charge[];
+  startCharge: (charge: Omit<Charge, 'id' | 'status' | 'endPercentage' | 'tariff' | 'customPrice'>) => void;
+  completeCharge: (chargeId: string, completionData: { endPercentage: number; tariff: TariffType; customPrice?: number; }) => void;
   trips: ProcessedTrip[];
   addTrip: (trip: Omit<Trip, 'id'>) => void;
   deleteTrip: (id: string) => void;
@@ -29,6 +32,8 @@ interface AppContextType {
   isOnline: boolean;
   notification: NotificationType | null;
   setNotification: React.Dispatch<React.SetStateAction<NotificationType | null>>;
+  activeView: View;
+  setActiveView: React.Dispatch<React.SetStateAction<View>>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -67,6 +72,7 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
   const [vehicles] = useState<Vehicle[]>(defaultVehles);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [notification, setNotification] = useState<NotificationType | null>(null);
+  const [activeView, setActiveView] = useState<View>('dashboard');
 
   useEffect(() => {
     const handleOnline = () => {
@@ -97,42 +103,54 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
     }
 
     setIsLoading(true);
-    const userId = currentUser.uid;
+    let isCancelled = false;
+    let unsubscribes: (() => void)[] = [];
 
-    const userDocRef = db.collection('users').doc(userId);
-    const chargesColRef = userDocRef.collection('charges');
-    const tripsColRef = userDocRef.collection('trips');
-    const maintenanceColRef = userDocRef.collection('maintenance');
+    const setupFirestoreListeners = async () => {
+      // Wait for persistence to be enabled before trying to access Firestore.
+      // This fixes a potential race condition.
+      await firestorePromise;
 
-    const unsubscribes = [
-      userDocRef.onSnapshot((docSnap) => {
-        if (docSnap.exists) {
-          setSettings({ ...defaultSettings, ...(docSnap.data() as Partial<Settings>) });
-        } else {
-          userDocRef.set(defaultSettings);
-          setSettings(defaultSettings);
-        }
-      }),
-      chargesColRef.onSnapshot((snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Charge));
-        setRawCharges(data);
-      }),
-      tripsColRef.onSnapshot((snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
-        setRawTrips(data);
-      }),
-      maintenanceColRef.onSnapshot((snapshot) => {
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceEntry));
-        setRawMaintenance(data);
-      }),
-    ];
-    
-    // Consider data loaded once listeners are attached.
-    // For a better UX, one could use a counter or Promise.all if we were doing one-time fetches.
-    // With listeners, this is a reasonable approach.
-    setIsLoading(false);
+      if (isCancelled) {
+        return;
+      }
+
+      const userId = currentUser.uid;
+      const userDocRef = db.collection('users').doc(userId);
+      const chargesColRef = userDocRef.collection('charges');
+      const tripsColRef = userDocRef.collection('trips');
+      const maintenanceColRef = userDocRef.collection('maintenance');
+
+      unsubscribes = [
+        userDocRef.onSnapshot((docSnap) => {
+          if (docSnap.exists) {
+            setSettings({ ...defaultSettings, ...(docSnap.data() as Partial<Settings>) });
+          } else {
+            userDocRef.set(defaultSettings);
+            setSettings(defaultSettings);
+          }
+        }),
+        chargesColRef.onSnapshot((snapshot) => {
+          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Charge));
+          setRawCharges(data);
+        }),
+        tripsColRef.onSnapshot((snapshot) => {
+          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Trip));
+          setRawTrips(data);
+        }),
+        maintenanceColRef.onSnapshot((snapshot) => {
+          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as MaintenanceEntry));
+          setRawMaintenance(data);
+        }),
+      ];
+      
+      setIsLoading(false);
+    };
+
+    setupFirestoreListeners();
 
     return () => {
+        isCancelled = true;
         unsubscribes.forEach(unsub => unsub());
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
@@ -145,10 +163,24 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
     await userDocRef.set(newSettingsPart, { merge: true });
   };
   
-  const addCharge = async (chargeData: Omit<Charge, 'id'>) => {
+  const addCharge = async (chargeData: Omit<Charge, 'id' | 'status'>) => {
     if (!currentUser) return;
     const chargesColRef = db.collection('users').doc(currentUser.uid).collection('charges');
-    await chargesColRef.add(chargeData);
+    await chargesColRef.add({ ...chargeData, status: 'completed' });
+    setActiveView('journal');
+  };
+
+  const startCharge = async (chargeData: Omit<Charge, 'id' | 'status' | 'endPercentage' | 'tariff' | 'customPrice'>) => {
+    if (!currentUser) return;
+    const chargesColRef = db.collection('users').doc(currentUser.uid).collection('charges');
+    await chargesColRef.add({ ...chargeData, status: 'pending' });
+    setActiveView('dashboard');
+  };
+
+  const completeCharge = async (chargeId: string, completionData: { endPercentage: number; tariff: TariffType; customPrice?: number; }) => {
+    if (!currentUser) return;
+    const chargeDocRef = db.collection('users').doc(currentUser.uid).collection('charges').doc(chargeId);
+    await chargeDocRef.update({ ...completionData, status: 'completed' });
   };
   
   const deleteCharge = async (id: string) => {
@@ -180,7 +212,7 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
       const batch = db.batch();
       uniqueNewCharges.forEach(charge => {
         const newDocRef = chargesColRef.doc();
-        batch.set(newDocRef, charge);
+        batch.set(newDocRef, { ...charge, status: 'completed' });
       });
       await batch.commit();
     }
@@ -192,6 +224,7 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
     if (!currentUser) return;
     const tripsColRef = db.collection('users').doc(currentUser.uid).collection('trips');
     await tripsColRef.add(tripData);
+    setActiveView('trajets');
   };
 
   const deleteTrip = async (id: string) => {
@@ -236,6 +269,7 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
     if (!currentUser) return;
     const maintenanceColRef = db.collection('users').doc(currentUser.uid).collection('maintenance');
     await maintenanceColRef.add(entryData);
+    setActiveView('entretien');
   };
 
   const deleteMaintenanceEntry = async (id: string) => {
@@ -244,7 +278,10 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
     await maintenanceDocRef.delete();
   };
 
-  const processedCharges = useMemo(() => processCharges(rawCharges, settings), [rawCharges, settings]);
+  const pendingCharges = useMemo(() => rawCharges.filter(c => c.status === 'pending').sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [rawCharges]);
+  const completedCharges = useMemo(() => rawCharges.filter(c => c.status === 'completed'), [rawCharges]);
+
+  const processedCharges = useMemo(() => processCharges(completedCharges, settings), [completedCharges, settings]);
   const processedTrips = useMemo(() => {
     return processTrips(rawTrips, settings, processedCharges);
   }, [rawTrips, settings, processedCharges]);
@@ -257,6 +294,9 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
     addCharge,
     deleteCharge,
     importCharges,
+    pendingCharges,
+    startCharge,
+    completeCharge,
     trips: processedTrips,
     addTrip,
     deleteTrip,
@@ -269,6 +309,8 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
     isOnline,
     notification,
     setNotification,
+    activeView,
+    setActiveView,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -1,4 +1,5 @@
 
+
 import { Charge, ProcessedCharge, ProcessedTrip, Settings, StatsData, TariffType, Trip, TripStatsData, ClientStats, DestinationStats, MaintenanceEntry, ProcessedMaintenanceEntry } from '../types';
 
 // Les tarifs en courant alternatif (AC) sont sujets à des pertes lors de la recharge, de la prise à la batterie.
@@ -11,13 +12,19 @@ const AC_TARIFFS: TariffType[] = [
   TariffType.TEMPO_WHITE_OFFPEAK,
   TariffType.TEMPO_RED_PEAK,
   TariffType.TEMPO_RED_OFFPEAK,
+  TariffType.FREE_CHARGE,
 ];
 // Nous appliquons une perte d'énergie de 12% pour la recharge en AC.
 const CHARGING_LOSS_FACTOR = 1.12;
 
 
 export const processCharges = (charges: Charge[], settings: Settings): ProcessedCharge[] => {
-  const sortedCharges = [...charges].sort((a, b) => a.odometer - b.odometer);
+  const completedCharges = charges.filter(
+    (c): c is Charge & { endPercentage: number; tariff: TariffType } =>
+      c.status === 'completed' && c.endPercentage != null && c.tariff != null
+  );
+
+  const sortedCharges = [...completedCharges].sort((a, b) => a.odometer - b.odometer);
   const processedResult: ProcessedCharge[] = [];
 
   for (let index = 0; index < sortedCharges.length; index++) {
@@ -41,6 +48,7 @@ export const processCharges = (charges: Charge[], settings: Settings): Processed
         case TariffType.TEMPO_RED_PEAK: pricePerKwh = settings.priceTempoRedPeak; break;
         case TariffType.TEMPO_RED_OFFPEAK: pricePerKwh = settings.priceTempoRedOffPeak; break;
         case TariffType.QUICK_CHARGE: pricePerKwh = charge.customPrice || 0; break;
+        case TariffType.FREE_CHARGE: pricePerKwh = 0; break;
         default: pricePerKwh = 0;
       }
 
@@ -123,6 +131,20 @@ export const generateStats = (charges: ProcessedCharge[], period: 'weekly' | 'mo
     const totalDistance = groupCharges.reduce((sum, c) => sum + (c.distanceDriven || 0), 0);
     const totalTripCost = groupCharges.reduce((sum, c) => sum + ((c.costPer100km || 0) * (c.distanceDriven || 0) / 100), 0);
     
+    const kwhPerTariff: { [key in TariffType]?: number } = {};
+    const costPerTariff: { [key in TariffType]?: number } = {};
+    for (const charge of groupCharges) {
+        kwhPerTariff[charge.tariff] = (kwhPerTariff[charge.tariff] || 0) + charge.kwhAdded;
+        costPerTariff[charge.tariff] = (costPerTariff[charge.tariff] || 0) + charge.cost;
+    }
+    // Round values
+    for (const tariff of Object.keys(kwhPerTariff) as TariffType[]) {
+        kwhPerTariff[tariff] = parseFloat(kwhPerTariff[tariff]!.toFixed(2));
+    }
+    for (const tariff of Object.keys(costPerTariff) as TariffType[]) {
+        costPerTariff[tariff] = parseFloat(costPerTariff[tariff]!.toFixed(2));
+    }
+
     const avgConsumption = totalDistance > 0 ? (totalKwh / totalDistance) * 100 : 0;
     const avgCostPer100km = totalDistance > 0 ? (totalTripCost / totalDistance) * 100 : 0;
 
@@ -131,14 +153,41 @@ export const generateStats = (charges: ProcessedCharge[], period: 'weekly' | 'mo
         totalGasolineCost = (totalDistance / 100) * settings.gasolineCarConsumption * settings.gasolinePricePerLiter;
     }
 
+    let slowChargeKwh = 0;
+    let fastChargeKwh = 0;
+    let slowChargeCost = 0;
+    let fastChargeCost = 0;
+    let slowChargeCount = 0;
+    let fastChargeCount = 0;
+
+    groupCharges.forEach(charge => {
+        if (charge.tariff === TariffType.QUICK_CHARGE) {
+            fastChargeKwh += charge.kwhAdded;
+            fastChargeCost += charge.cost;
+            fastChargeCount++;
+        } else {
+            slowChargeKwh += charge.kwhAdded;
+            slowChargeCost += charge.cost;
+            slowChargeCount++;
+        }
+    });
+
     return {
       name: key,
       totalKwh: parseFloat(totalKwh.toFixed(2)),
+      kwhPerTariff,
+      costPerTariff,
       totalCost: parseFloat(totalCost.toFixed(2)),
       totalDistance: parseFloat(totalDistance.toFixed(0)),
       avgConsumption: parseFloat(avgConsumption.toFixed(2)),
       avgCostPer100km: parseFloat(avgCostPer100km.toFixed(2)),
       totalGasolineCost: parseFloat(totalGasolineCost.toFixed(2)),
+      slowChargeKwh: parseFloat(slowChargeKwh.toFixed(2)),
+      fastChargeKwh: parseFloat(fastChargeKwh.toFixed(2)),
+      slowChargeCost: parseFloat(slowChargeCost.toFixed(2)),
+      fastChargeCost: parseFloat(fastChargeCost.toFixed(2)),
+      slowChargeCount,
+      fastChargeCount,
     };
   });
   

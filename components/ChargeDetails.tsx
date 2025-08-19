@@ -54,7 +54,7 @@ Voici le récapitulatif de votre recharge :
 - Équivalent distance thermique : ${charge.gasolineEquivalentKm !== null ? `${charge.gasolineEquivalentKm} km` : 'N/A'}
 
 Cordialement,
-Votre application Suivi Conso EV
+Votre application Suivi Conso EV Online
         `.trim().replace(/^\s+/gm, '');
 
         const mailtoLink = `mailto:${settings.recapEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -238,6 +238,7 @@ Votre application Suivi Conso EV
                     startPercentage: startNum,
                     endPercentage: endNum,
                     tariff: tariff as TariffType,
+                    status: 'completed',
                 };
 
                 if (newCharge.tariff === TariffType.QUICK_CHARGE) {

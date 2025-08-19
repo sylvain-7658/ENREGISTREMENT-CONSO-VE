@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, FC, PropsWithChildren } from 'react';
 import { auth } from '../firebase/config';
 import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
 
 // The compat User type
 type User = firebase.User;

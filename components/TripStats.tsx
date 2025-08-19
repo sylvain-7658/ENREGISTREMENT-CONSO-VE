@@ -1,8 +1,11 @@
 
+
+
+
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { generateClientStats, generateDestinationStats } from '../utils/calculations';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, LabelList } from 'recharts';
 import { MapPin, Briefcase, BarChart3 } from 'lucide-react';
 
 const StatCard = ({ title, value, icon }: { title: string, value: string, icon: React.ReactNode }) => (
@@ -77,12 +80,14 @@ const TripStats: React.FC = () => {
                     <h3 className="text-xl font-semibold text-slate-700 dark:text-slate-200 mb-4">Top 5 Clients par Montant Facturé</h3>
                     <div style={{ width: '100%', height: 300 }}>
                         <ResponsiveContainer>
-                            <BarChart data={topClients} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
+                            <BarChart data={topClients} margin={{ top: 30, right: 20, left: -10, bottom: 5 }}>
                                 <XAxis dataKey="name" />
                                 <YAxis unit="€" />
                                 <Tooltip content={<CustomTooltip />} />
                                 <Legend />
-                                <Bar dataKey="totalBillingAmount" name="Total Facturé" unit="€" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="totalBillingAmount" name="Total Facturé" unit="€" fill="#4f46e5" radius={[4, 4, 0, 0]}>
+                                    <LabelList dataKey="totalBillingAmount" position="top" formatter={(value: number) => value > 0 ? value.toFixed(2) + '€' : ''} fontSize={12} className="fill-slate-600 dark:fill-slate-300" />
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>

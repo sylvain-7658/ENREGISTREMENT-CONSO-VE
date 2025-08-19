@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Trash2, Wrench } from 'lucide-react';
@@ -18,11 +17,6 @@ const MaintenanceList: React.FC = () => {
 
     return (
         <div>
-            <div className="px-6 pt-6 pb-4">
-                <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
-                    Journal d'entretien
-                </h2>
-            </div>
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                      <thead className="bg-slate-50 dark:bg-slate-700/50">

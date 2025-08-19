@@ -1,6 +1,6 @@
 {
-  "short_name": "Suivi EV",
-  "name": "Suivi Conso EV",
+  "short_name": "Suivi EV Online",
+  "name": "Suivi Conso EV Online",
   "description": "Une application pour suivre la consommation et les coûts de recharge d'un véhicule électrique.",
   "icons": [
     {

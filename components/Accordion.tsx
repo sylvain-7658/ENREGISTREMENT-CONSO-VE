@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 
 interface AccordionProps {
-  title: string;
+  title: ReactNode;
   children: ReactNode;
   icon?: React.ReactNode;
   startOpen?: boolean;

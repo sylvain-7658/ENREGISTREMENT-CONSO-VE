@@ -1,7 +1,4 @@
-
-
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import ChargeJournal from './components/ChargeJournal';
 import Settings from './components/Settings';
@@ -15,8 +12,10 @@ import { useAuth } from './context/AuthContext';
 import Login from './components/auth/Login';
 import Notification from './components/Notification';
 import { AnimatePresence } from 'framer-motion';
-
-export type View = 'dashboard' | 'journal' | 'trajets' | 'entretien' | 'stats' | 'settings';
+import ChargeForm from './components/ChargeForm';
+import TripForm from './components/TripForm';
+import MaintenanceForm from './components/MaintenanceForm';
+import { View } from './types';
 
 const NavItem = ({ label, icon: Icon, isActive, onClick }: { label: string; icon: React.ElementType, isActive: boolean; onClick: () => void }) => (
     <button
@@ -47,8 +46,7 @@ const MobileNavItem = ({ label, icon: Icon, isActive, onClick }: { label: string
 );
 
 const AppContent: React.FC = () => {
-    const [activeView, setActiveView] = useState<View>('dashboard');
-    const { isLoading, notification, setNotification } = useAppContext();
+    const { isLoading, notification, setNotification, activeView, setActiveView } = useAppContext();
     const { currentUser, logout } = useAuth();
 
     if (isLoading) {
@@ -66,7 +64,7 @@ const AppContent: React.FC = () => {
                                     <path d="M13 3V9H18L10 21V15H5L13 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                                 <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100">
-                                    Suivi EV
+                                    Suivi EV Online
                                 </h1>
                             </div>
                         </div>
@@ -95,12 +93,15 @@ const AppContent: React.FC = () => {
             </header>
 
             <main className="container mx-auto p-4 sm:p-6 lg:p-8">
-                {activeView === 'dashboard' && <Dashboard setActiveView={setActiveView} />}
+                {activeView === 'dashboard' && <Dashboard />}
                 {activeView === 'journal' && <ChargeJournal />}
                 {activeView === 'trajets' && <TripJournal />}
                 {activeView === 'entretien' && <MaintenanceJournal />}
                 {activeView === 'stats' && <Stats />}
                 {activeView === 'settings' && <Settings />}
+                {activeView === 'add-charge' && <ChargeForm />}
+                {activeView === 'add-trip' && <TripForm />}
+                {activeView === 'add-maintenance' && <MaintenanceForm />}
             </main>
             
             {/* Mobile Bottom Navigation */}

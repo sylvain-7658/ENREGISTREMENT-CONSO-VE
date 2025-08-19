@@ -31,21 +31,19 @@ if (!firebase.apps.length) {
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// Enable Firestore offline persistence with tab synchronization
-try {
-    db.enablePersistence({ synchronizeTabs: true })
-      .catch((err) => {
-        if (err.code == 'failed-precondition') {
-          // Multiple tabs open, persistence can only be enabled in one tab at a time.
-          console.warn("Firestore offline persistence failed: multiple tabs open.");
-        } else if (err.code == 'unimplemented') {
-          // The current browser does not support all of the features required to enable persistence.
-          console.warn("Firestore offline persistence is not supported in this browser.");
-        }
-      });
-} catch(e) {
-    console.error("Failed to enable Firestore persistence", e);
-}
+// We create a promise that resolves once persistence is enabled.
+// This prevents race conditions where we try to read/write data
+// before the offline cache is ready.
+const firestorePromise = db.enablePersistence({ synchronizeTabs: true })
+  .catch((err) => {
+    if (err.code === 'failed-precondition') {
+      // This can happen if multiple tabs are open.
+      console.warn("Firestore offline persistence failed: multiple tabs open.");
+    } else if (err.code === 'unimplemented') {
+      // The browser may not support all features required for persistence.
+      console.warn("Firestore offline persistence is not supported in this browser.");
+    }
+  });
 
 
-export { auth, db };
+export { auth, db, firestorePromise };

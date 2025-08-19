@@ -1,4 +1,7 @@
 
+
+export type View = 'dashboard' | 'journal' | 'trajets' | 'entretien' | 'stats' | 'settings' | 'add-charge' | 'add-trip' | 'add-maintenance';
+
 export interface Vehicle {
   name: string;
   capacity: number;
@@ -37,19 +40,23 @@ export enum TariffType {
   TEMPO_RED_PEAK = 'Tempo Rouge - Heures Pleines',
   TEMPO_RED_OFFPEAK = 'Tempo Rouge - Heures Creuses',
   QUICK_CHARGE = 'Recharge borne rapide',
+  FREE_CHARGE = 'Borne gratuite',
 }
 
 export interface Charge {
   id: string;
   date: string; // ISO string format
   startPercentage: number;
-  endPercentage: number;
+  endPercentage?: number;
   odometer: number; // in km
-  tariff: TariffType;
+  tariff?: TariffType;
   customPrice?: number; // price per kWh for quick charge
+  status: 'pending' | 'completed';
 }
 
 export interface ProcessedCharge extends Charge {
+  endPercentage: number;
+  tariff: TariffType;
   kwhAdded: number;
   cost: number;
   distanceDriven: number | null;
@@ -105,11 +112,19 @@ export interface ProcessedMaintenanceEntry extends MaintenanceEntry {}
 export interface StatsData {
   name: string;
   totalKwh: number;
+  kwhPerTariff: { [key in TariffType]?: number };
+  costPerTariff: { [key in TariffType]?: number };
   totalCost: number;
   totalDistance: number;
   avgConsumption: number;
   avgCostPer100km: number;
   totalGasolineCost: number;
+  slowChargeKwh?: number;
+  fastChargeKwh?: number;
+  slowChargeCost?: number;
+  fastChargeCost?: number;
+  slowChargeCount?: number;
+  fastChargeCount?: number;
 }
 
 export interface TripStatsData {

@@ -1,5 +1,5 @@
 {
-  "name": "suivi-conso-v4",
+  "name": "suivi-conso-ev-online-v5",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -17,7 +17,8 @@
     "jspdf": "^2.5.1",
     "html2canvas": "^1.4.1",
     "framer-motion": "^11.3.19",
-    "firebase": "^12.1.0"
+    "firebase": "^12.1.0",
+    "@google/genai": "latest"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

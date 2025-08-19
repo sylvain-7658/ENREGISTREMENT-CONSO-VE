@@ -15,6 +15,7 @@ const rawVehicles: Vehicle[] = [
   { name: 'Volkswagen ID.3 Pro', capacity: 58 },
   { name: 'Volkswagen ID.3 Pure', capacity: 45 },
   { name: 'Volkswagen ID.4', capacity: 77 },
+  { name: 'Renault 5', capacity: 52 },
 ];
 
 const customOption: Vehicle = { name: 'Autre / Personnalisé', capacity: 0 };
