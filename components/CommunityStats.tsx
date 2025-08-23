@@ -44,17 +44,19 @@ const CommunityStats: React.FC = () => {
         const fetchData = async () => {
             setLoading(true);
             setError(null);
+            
+            // --- Fetch user count with graceful failure ---
+            let userCount: number | null = null;
             try {
-                // Attempt to fetch user count, but gracefully fail if permissions are restrictive.
-                let userCount: number | null = null;
-                try {
-                    const usersSnapshot = await db.collection('users').get();
-                    userCount = usersSnapshot.size;
-                } catch (userCountError) {
-                    console.warn("Could not fetch user count. This is likely due to Firestore security rules and is expected.", userCountError);
-                }
-                setTotalUsers(userCount);
+                const usersSnapshot = await db.collection('users').get();
+                userCount = usersSnapshot.size;
+            } catch (userCountError) {
+                console.warn("Could not fetch user count. This is likely due to Firestore security rules and is expected.", userCountError);
+            }
+            setTotalUsers(userCount);
 
+            // --- Fetch global stats with graceful failure ---
+            try {
                 const statsSnapshot = await db.collection('globalStats').get();
                 const globalStatsData: GlobalStat[] = statsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GlobalStat));
 
@@ -84,8 +86,8 @@ const CommunityStats: React.FC = () => {
                 setTotalVehicles(vehicleSum);
                 setStats(processedStats);
             } catch (err) {
-                console.error("Error fetching community stats:", err);
-                setError("Impossible de charger les statistiques de la communauté. Veuillez réessayer plus tard.");
+                console.error("Error fetching community stats from globalStats:", err);
+                // Do not set a global error. The UI will show "no stats available" message.
             } finally {
                 setLoading(false);
             }
