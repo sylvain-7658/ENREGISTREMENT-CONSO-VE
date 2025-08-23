@@ -1,5 +1,5 @@
 {
-  "name": "Copy of Volty-Conso",
+  "name": "Volty-Consov2",
   "description": "Une application pour suivre la consommation et les coûts de recharge d'un véhicule électrique.",
   "requestFramePermissions": [
     "camera"

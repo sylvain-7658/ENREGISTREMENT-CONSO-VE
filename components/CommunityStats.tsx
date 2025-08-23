@@ -35,7 +35,6 @@ const StatCard = ({ title, value, icon }: { title: string; value: string; icon: 
 const CommunityStats: React.FC = () => {
     const { setActiveView } = useAppContext();
     const [stats, setStats] = useState<ProcessedStat[]>([]);
-    const [totalUsers, setTotalUsers] = useState<number | null>(null);
     const [totalVehicles, setTotalVehicles] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -45,19 +44,15 @@ const CommunityStats: React.FC = () => {
             setLoading(true);
             setError(null);
             
-            // --- Fetch user count with graceful failure ---
-            let userCount: number | null = null;
-            try {
-                const usersSnapshot = await db.collection('users').get();
-                userCount = usersSnapshot.size;
-            } catch (userCountError) {
-                console.warn("Could not fetch user count. This is likely due to Firestore security rules and is expected.", userCountError);
-            }
-            setTotalUsers(userCount);
-
-            // --- Fetch global stats with graceful failure ---
             try {
                 const statsSnapshot = await db.collection('globalStats').get();
+                if (statsSnapshot.empty) {
+                    setStats([]);
+                    setTotalVehicles(0);
+                    setLoading(false);
+                    return;
+                }
+                
                 const globalStatsData: GlobalStat[] = statsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GlobalStat));
 
                 let vehicleSum = 0;
@@ -87,7 +82,7 @@ const CommunityStats: React.FC = () => {
                 setStats(processedStats);
             } catch (err) {
                 console.error("Error fetching community stats from globalStats:", err);
-                // Do not set a global error. The UI will show "no stats available" message.
+                setError("Impossible de charger les statistiques de la communauté. Veuillez vérifier les règles de sécurité Firestore pour la collection 'globalStats'.");
             } finally {
                 setLoading(false);
             }
@@ -101,14 +96,6 @@ const CommunityStats: React.FC = () => {
             <div className="flex justify-center items-center py-20">
                 <Loader2 className="animate-spin h-12 w-12 text-blue-500" />
             </div>
-        );
-    }
-
-    if (error) {
-        return (
-            <Card>
-                <p className="text-center text-red-500">{error}</p>
-            </Card>
         );
     }
 
@@ -128,41 +115,47 @@ const CommunityStats: React.FC = () => {
                 </div>
             </div>
             
-            <div className={`grid grid-cols-1 ${totalUsers !== null ? 'md:grid-cols-2' : ''} gap-6`}>
-                {totalUsers !== null && (
-                    <StatCard title="Utilisateurs Inscrits" value={totalUsers.toLocaleString('fr-FR')} icon={<Users size={24} />} />
-                )}
-                <StatCard title="Véhicules Enregistrés" value={totalVehicles !== null ? totalVehicles.toLocaleString('fr-FR') : '-'} icon={<Car size={24} />} />
-            </div>
-            
-            <Card>
-                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-4">Statistiques par Modèle de Véhicule</h3>
-                <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                        <thead className="bg-slate-50 dark:bg-slate-700/50">
-                            <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Modèle</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Nombre</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Distance Moy./Véhicule</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Conso. Moy.</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Coût Moy./km</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
-                            {stats.map(stat => (
-                                <tr key={stat.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-800 dark:text-slate-100">{stat.modelName}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300 font-semibold">{stat.vehicleCount}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{stat.avgDistancePerVehicle.toFixed(0)} km</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{stat.avgConsumption.toFixed(2)} kWh/100km</td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{stat.avgCostPerKm.toFixed(3)} €</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-                 {stats.length === 0 && <p className="text-center py-8 text-slate-500 dark:text-slate-400">Aucune statistique de la communauté n'est encore disponible.</p>}
-            </Card>
+            {error ? (
+                <Card>
+                    <p className="text-center text-red-500 py-8">{error}</p>
+                </Card>
+            ) : (
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <StatCard title="Total des Utilisateurs" value="N/A" icon={<Users size={24} />} />
+                        <StatCard title="Véhicules Enregistrés" value={totalVehicles !== null ? totalVehicles.toLocaleString('fr-FR') : '-'} icon={<Car size={24} />} />
+                    </div>
+                    
+                    <Card>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-4">Statistiques par Modèle de Véhicule</h3>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                                <thead className="bg-slate-50 dark:bg-slate-700/50">
+                                    <tr>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Modèle</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Nombre</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Distance Moy./Véhicule</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Conso. Moy.</th>
+                                        <th scope="col" className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider">Coût Moy./km</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+                                    {stats.map(stat => (
+                                        <tr key={stat.id}>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-800 dark:text-slate-100">{stat.modelName}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300 font-semibold">{stat.vehicleCount}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{stat.avgDistancePerVehicle.toFixed(0)} km</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{stat.avgConsumption.toFixed(2)} kWh/100km</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">{stat.avgCostPerKm.toFixed(3)} €</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {stats.length === 0 && <p className="text-center py-8 text-slate-500 dark:text-slate-400">Aucune statistique de la communauté n'est encore disponible.</p>}
+                    </Card>
+                </>
+            )}
         </div>
     );
 };
