@@ -22,6 +22,17 @@ const Select = (props: React.SelectHTMLAttributes<HTMLSelectElement>) => (
      <select {...props} className="block w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"/>
 );
 
+const modalBackdropVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+};
+
+const modalContentVariants = {
+    hidden: { scale: 0.9, y: 20 },
+    visible: { scale: 1, y: 0 },
+};
+
+
 const CameraModal = ({ isOpen, onClose, onCapture, isAnalyzing }: { isOpen: boolean, onClose: () => void, onCapture: (data: string) => void, isAnalyzing: boolean }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,14 +42,21 @@ const CameraModal = ({ isOpen, onClose, onCapture, isAnalyzing }: { isOpen: bool
         const startCamera = async () => {
             if (isOpen && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    const constraints = {
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                        }
+                    };
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
                     streamRef.current = stream;
                     if (videoRef.current) {
                         videoRef.current.srcObject = stream;
                     }
                 } catch (err) {
                     console.error("Error accessing camera: ", err);
-                    alert("Impossible d'accéder à la caméra. Veuillez vérifier les autorisations de votre navigateur.");
+                    alert("Impossible d'accéder à la caméra. Veuillez vérifier les autorisations et les capacités de votre appareil.");
                     onClose();
                 }
             }
@@ -61,7 +79,7 @@ const CameraModal = ({ isOpen, onClose, onCapture, isAnalyzing }: { isOpen: bool
             canvas.height = video.videoHeight;
             const context = canvas.getContext('2d');
             context?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-            onCapture(canvas.toDataURL('image/jpeg'));
+            onCapture(canvas.toDataURL('image/jpeg', 0.95)); // Use higher quality
         }
     };
     
@@ -69,15 +87,15 @@ const CameraModal = ({ isOpen, onClose, onCapture, isAnalyzing }: { isOpen: bool
         <AnimatePresence>
             {isOpen && (
                 <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
+                    initial={modalBackdropVariants.hidden}
+                    animate={modalBackdropVariants.visible}
+                    exit={modalBackdropVariants.hidden}
                     className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
                 >
                     <motion.div
-                        initial={{ scale: 0.9, y: 20 }}
-                        animate={{ scale: 1, y: 0 }}
-                        exit={{ scale: 0.9, y: 20 }}
+                        initial={modalContentVariants.hidden}
+                        animate={modalContentVariants.visible}
+                        exit={modalContentVariants.hidden}
                         className="relative w-full max-w-2xl bg-slate-800 rounded-lg overflow-hidden"
                     >
                          {isAnalyzing && (
@@ -89,6 +107,9 @@ const CameraModal = ({ isOpen, onClose, onCapture, isAnalyzing }: { isOpen: bool
                         )}
                         <video ref={videoRef} autoPlay playsInline muted className="w-full h-auto"></video>
                         <canvas ref={canvasRef} className="hidden"></canvas>
+                        <div className="absolute top-4 left-4 right-4 text-center text-white text-sm bg-black/40 p-2 rounded-lg">
+                           <p>Tenez votre téléphone horizontalement pour un meilleur résultat.</p>
+                        </div>
                         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/50 to-transparent flex justify-center">
                            <button onClick={handleTakePhoto} className="p-4 bg-white rounded-full shadow-lg" aria-label="Prendre une photo">
                                <Camera size={24} className="text-slate-800" />
@@ -242,7 +263,7 @@ const ChargeForm: React.FC = () => {
             return;
         }
 
-        const newCharge: Omit<Charge, 'id' | 'status'> = {
+        const newCharge: Omit<Charge, 'id' | 'status' | 'vehicleId'> = {
             date,
             startPercentage: start,
             endPercentage: end,

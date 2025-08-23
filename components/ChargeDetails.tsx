@@ -1,28 +1,107 @@
-import React, { useRef, useState, useMemo } from 'react';
+import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
-import { Trash2, Download, Upload, Mail, FileDown, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { Trash2, Download, Upload, Mail, FileDown, ChevronLeft, ChevronRight, Zap, Loader2, Send, CheckCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Charge, ProcessedCharge, TariffType } from '../types';
+import { Charge, ProcessedCharge, TariffType, Settings, UserVehicle } from '../types';
+import ChargeInvoice from './ChargeInvoice';
 
 const ITEMS_PER_PAGE = 10;
 
+// MonthlyStats type for the invoice
+interface MonthlyStats {
+    totalDistance: number;
+    totalKwh: number;
+    avgConsumption: number;
+    totalSavings: number;
+    totalCost: number;
+}
+
+const modalBackdropVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+};
+
+const modalContentVariants = {
+    hidden: { scale: 0.9, y: 20, opacity: 0 },
+    visible: { scale: 1, y: 0, opacity: 1 },
+};
+
+const EmailPromptModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+}> = ({ isOpen, onClose, onConfirm }) => {
+    return (
+        <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    initial={modalBackdropVariants.hidden}
+                    animate={modalBackdropVariants.visible}
+                    exit={modalBackdropVariants.hidden}
+                    className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 no-print"
+                >
+                    <motion.div
+                        initial={modalContentVariants.hidden}
+                        animate={modalContentVariants.visible}
+                        exit={modalContentVariants.hidden}
+                        className="w-full max-w-md bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 text-center"
+                    >
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/50 mb-4">
+                            <CheckCircle className="h-10 w-10 text-green-600 dark:text-green-400" />
+                        </div>
+                        <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">
+                            Relevé PDF téléchargé !
+                        </h3>
+                        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                            Le fichier est prêt. Cliquez ci-dessous pour ouvrir votre messagerie. N'oubliez pas de joindre manuellement le PDF téléchargé.
+                        </p>
+                        <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                            <button
+                                onClick={onClose}
+                                className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 transition-colors"
+                            >
+                                Annuler
+                            </button>
+                            <button
+                                onClick={onConfirm}
+                                className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm transition-colors"
+                            >
+                                <Send size={16} />
+                                Ouvrir l'e-mail pour envoyer
+                            </button>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
+};
+
+
 const ChargeDetails: React.FC = () => {
-    const { charges, deleteCharge, importCharges, settings } = useAppContext();
+    const { charges, deleteCharge, importCharges, settings, setNotification, activeVehicle } = useAppContext();
     const { currentUser } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isExportingPdf, setIsExportingPdf] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
+    const [isGeneratingInvoice, setIsGeneratingInvoice] = useState(false);
+    const [invoiceData, setInvoiceData] = useState<{ charge: ProcessedCharge; monthlyStats: MonthlyStats; settings: Settings, vehicle: UserVehicle } | null>(null);
+    const invoiceRef = useRef<HTMLDivElement>(null);
+    const [showEmailPrompt, setShowEmailPrompt] = useState(false);
+    const [emailLink, setEmailLink] = useState('');
 
     const reversedCharges = useMemo(() => [...charges].reverse(), [charges]);
     const vehicleInfoText = useMemo(() => {
-        if (settings.registrationNumber) {
-            return `${settings.vehicleModel} (${settings.registrationNumber})`;
+        if (!activeVehicle) return '';
+        if (activeVehicle.registrationNumber) {
+            return `${activeVehicle.name} (${activeVehicle.registrationNumber})`;
         }
-        return settings.vehicleModel;
-    }, [settings.vehicleModel, settings.registrationNumber]);
+        return activeVehicle.name;
+    }, [activeVehicle]);
 
     const totalPages = Math.ceil(reversedCharges.length / ITEMS_PER_PAGE);
     const paginatedCharges = useMemo(() => {
@@ -30,36 +109,122 @@ const ChargeDetails: React.FC = () => {
         return reversedCharges.slice(startIndex, startIndex + ITEMS_PER_PAGE);
     }, [currentPage, reversedCharges]);
 
-    const handleSendEmail = (charge: ProcessedCharge) => {
+    useEffect(() => {
+        if (!invoiceData) return;
+
+        const generatePdf = async () => {
+            const reportElement = invoiceRef.current?.querySelector('#pdf-invoice');
+            if (!reportElement) {
+                console.error("Invoice element not found for PDF generation.");
+                setNotification({
+                    type: 'warning',
+                    message: "Erreur lors de la préparation du relevé. Veuillez réessayer."
+                });
+                setIsGeneratingInvoice(false);
+                setInvoiceData(null);
+                return;
+            }
+
+            try {
+                const canvas = await html2canvas(reportElement as HTMLElement, { scale: 1.5 });
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+                
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const canvasWidth = canvas.width;
+                const canvasHeight = canvas.height;
+                const ratio = canvasHeight / canvasWidth;
+                const imgHeight = pdfWidth * ratio;
+                
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
+                
+                const chargeDate = new Date(invoiceData.charge.date).toISOString().split('T')[0];
+                pdf.save(`releve-recharge-${chargeDate}.pdf`);
+
+                // Prepare mailto link but DO NOT open it yet
+                const subject = `Relevé de votre recharge du ${new Date(invoiceData.charge.date).toLocaleDateString('fr-FR')}`;
+                const body = `Bonjour,
+
+Veuillez trouver en pièce jointe le relevé de la recharge.
+
+Cordialement,
+Votre application Suivi Conso EV Online`.trim().replace(/^\s+/gm, '');
+                
+                const mailtoLink = `mailto:${settings.recapEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                setEmailLink(mailtoLink);
+                setShowEmailPrompt(true); // Show the confirmation modal instead of navigating
+
+            } catch (error) {
+                console.error("Failed to generate PDF:", error);
+                setNotification({
+                    type: 'warning',
+                    message: "Une erreur est survenue lors de la génération du PDF."
+                });
+            } finally {
+                setIsGeneratingInvoice(false);
+                setInvoiceData(null); // Clear data after preparing
+            }
+        };
+
+        const timer = setTimeout(generatePdf, 250); // a small delay to ensure invoiceRef is rendered
+        return () => clearTimeout(timer);
+
+    }, [invoiceData, settings.recapEmail, setNotification]);
+
+    const handleConfirmSendEmail = () => {
+        if (emailLink) {
+            window.location.href = emailLink;
+        }
+        setShowEmailPrompt(false);
+        setEmailLink('');
+    };
+
+    const handleGenerateInvoice = (charge: ProcessedCharge) => {
+        if (isGeneratingInvoice || !activeVehicle) return;
         if (!settings.recapEmail || !/^\S+@\S+\.\S+$/.test(settings.recapEmail)) {
-            alert("Veuillez configurer une adresse e-mail valide dans les Paramètres pour envoyer un récapitulatif.");
+            setNotification({
+                type: 'warning',
+                message: "Veuillez configurer une adresse e-mail valide dans les Paramètres."
+            });
             return;
         }
 
-        const subject = `Récapitulatif de votre recharge du ${new Date(charge.date).toLocaleDateString('fr-FR')}`;
-        const body = `
-Bonjour,
-
-Voici le récapitulatif de votre recharge :
-
-- Date : ${new Date(charge.date).toLocaleDateString('fr-FR')}
-- Kilométrage : ${charge.odometer.toLocaleString('fr-FR')} km
-- Niveau de batterie : ${charge.startPercentage}% → ${charge.endPercentage}%
-- Énergie ajoutée : ${charge.kwhAdded.toFixed(2)} kWh
-- Coût total : ${charge.cost.toFixed(2)} €
-- Tarif appliqué : ${charge.tariff}
-- Prix par kWh : ${charge.pricePerKwh.toFixed(4)} €
-- Consommation depuis dernière recharge : ${charge.consumptionKwh100km !== null ? `${charge.consumptionKwh100km.toFixed(2)} kWh/100km` : 'N/A'}
-- Coût par 100km : ${charge.costPer100km !== null ? `${charge.costPer100km.toFixed(2)} €/100km` : 'N/A'}
-- Équivalent distance thermique : ${charge.gasolineEquivalentKm !== null ? `${charge.gasolineEquivalentKm} km` : 'N/A'}
-
-Cordialement,
-Votre application Suivi Conso EV Online
-        `.trim().replace(/^\s+/gm, '');
-
-        const mailtoLink = `mailto:${settings.recapEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        setIsGeneratingInvoice(true);
         
-        window.location.href = mailtoLink;
+        // Calculate current month stats from dashboard
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        const chargesThisMonth = charges.filter(c => {
+            const chargeDate = new Date(c.date);
+            return chargeDate.getMonth() === currentMonth && chargeDate.getFullYear() === currentYear;
+        });
+        
+        const initialStats = { totalDistance: 0, totalKwh: 0, avgConsumption: 0, totalSavings: 0, totalCost: 0 };
+
+        const statsForMonth = chargesThisMonth.reduce((acc, c) => {
+            acc.totalDistance += (c.distanceDriven || 0);
+            acc.totalKwh += c.kwhAdded;
+            acc.totalCost += c.cost;
+            return acc;
+        }, initialStats);
+
+        statsForMonth.avgConsumption = statsForMonth.totalDistance > 0 ? (statsForMonth.totalKwh / statsForMonth.totalDistance) * 100 : 0;
+
+        if (statsForMonth.totalDistance > 0 && settings.gasolineCarConsumption > 0 && settings.gasolinePricePerLiter > 0) {
+            const totalGasolineCost = (statsForMonth.totalDistance / 100) * settings.gasolineCarConsumption * settings.gasolinePricePerLiter;
+            statsForMonth.totalSavings = totalGasolineCost - statsForMonth.totalCost;
+        }
+
+        statsForMonth.totalDistance = Math.round(statsForMonth.totalDistance);
+
+        setInvoiceData({
+            charge,
+            monthlyStats: statsForMonth,
+            settings,
+            vehicle: activeVehicle
+        });
     };
 
     const handleDownload = () => {
@@ -81,7 +246,7 @@ Votre application Suivi Conso EV Online
             c.kwhAdded.toFixed(2),
             c.cost.toFixed(2),
             c.tariff,
-            c.pricePerKwh.toFixed(4),
+            c.pricePerKwh.toFixed(2),
             c.consumptionKwh100km !== null ? c.consumptionKwh100km.toFixed(2) : '',
             c.costPer100km !== null ? c.costPer100km.toFixed(2) : '',
             c.gasolineEquivalentKm !== null ? c.gasolineEquivalentKm : ''
@@ -170,7 +335,7 @@ Votre application Suivi Conso EV Online
                 'prix/kwh': 'customPrice',
             };
 
-            const chargesToImport: Omit<Charge, 'id'>[] = [];
+            const chargesToImport: Omit<Charge, 'id' | 'vehicleId'>[] = [];
             const errors: string[] = [];
             const validTariffs = Object.values(TariffType) as string[];
 
@@ -232,7 +397,7 @@ Votre application Suivi Conso EV Online
                     return;
                 }
                 
-                const newCharge: Omit<Charge, 'id'> = {
+                const newCharge: Omit<Charge, 'id' | 'vehicleId'> = {
                     date: chargeDateStr,
                     odometer: odoNum,
                     startPercentage: startNum,
@@ -294,6 +459,11 @@ Votre application Suivi Conso EV Online
 
     return (
         <div id="charge-list-details">
+            <EmailPromptModal 
+                isOpen={showEmailPrompt}
+                onClose={() => setShowEmailPrompt(false)}
+                onConfirm={handleConfirmSendEmail}
+            />
             <div className="px-6 pt-6 pb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-100">
@@ -346,7 +516,7 @@ Votre application Suivi Conso EV Online
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-300">
                                     {charge.tariff}
-                                    <div className="text-xs text-slate-400">{charge.pricePerKwh.toFixed(4)} €/kWh</div>
+                                    <div className="text-xs text-slate-400">{charge.pricePerKwh.toFixed(2)} €/kWh</div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
                                     {charge.consumptionKwh100km !== null ? (
@@ -361,8 +531,8 @@ Votre application Suivi Conso EV Online
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium no-print">
                                     <div className="flex items-center justify-end space-x-1">
-                                         <button onClick={() => handleSendEmail(charge)} className="p-2 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Envoyer par e-mail">
-                                            <Mail size={16} />
+                                         <button onClick={() => handleGenerateInvoice(charge)} className="p-2 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Générer le relevé PDF pour e-mail" disabled={isGeneratingInvoice}>
+                                            {isGeneratingInvoice ? <Loader2 size={16} className="animate-spin" /> : <Mail size={16} />}
                                         </button>
                                         <button onClick={() => window.confirm('Êtes-vous sûr de vouloir supprimer cette recharge ?') && deleteCharge(charge.id)} className="p-2 text-slate-500 hover:text-red-600 dark:hover:text-red-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" title="Supprimer">
                                             <Trash2 size={16} />
@@ -395,6 +565,13 @@ Votre application Suivi Conso EV Online
                         Suivant
                         <ChevronRight size={16} />
                     </button>
+                </div>
+            )}
+            {isGeneratingInvoice && invoiceData && (
+                <div style={{ position: 'absolute', left: '-9999px', top: '-9999px', zIndex: -1 }}>
+                    <div ref={invoiceRef}>
+                        <ChargeInvoice data={invoiceData} />
+                    </div>
                 </div>
             )}
         </div>

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
@@ -52,7 +51,7 @@ const MaintenanceForm: React.FC = () => {
             return;
         }
 
-        const newEntry: Omit<MaintenanceEntry, 'id'> = {
+        const newEntry: Omit<MaintenanceEntry, 'id' | 'vehicleId'> = {
             date,
             odometer: odo,
             type,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, XAxis, YAxis, Legend, Bar, CartesianGrid } from 'recharts';
-import { ProcessedCharge, Settings, StatsData, TariffType, MaintenanceEntry } from '../types';
+import { ProcessedCharge, Settings, StatsData, TariffType, MaintenanceEntry, UserVehicle } from '../types';
 
 const TARIFF_COLORS: { [key in TariffType]: string } = {
     [TariffType.PEAK]: '#f97316',
@@ -29,10 +29,11 @@ interface ReportData {
   annualStats: StatsData;
   monthlyBreakdown: StatsData[];
   settings: Settings;
+  vehicle: UserVehicle;
 }
 
 const AnnualReport: React.FC<{ data: ReportData }> = ({ data }) => {
-    const { year, annualStats, monthlyBreakdown, settings, annualMaintenance } = data;
+    const { year, annualStats, monthlyBreakdown, settings, annualMaintenance, vehicle } = data;
     
     const totalMaintenanceCost = annualMaintenance.reduce((sum, entry) => sum + entry.cost, 0);
     const totalCost = (annualStats?.totalCost || 0) + totalMaintenanceCost;
@@ -62,8 +63,8 @@ const AnnualReport: React.FC<{ data: ReportData }> = ({ data }) => {
                     <p className="text-lg font-semibold text-blue-600">Année {year}</p>
                 </div>
                 <div className="text-right">
-                    <p className="font-semibold">{settings.vehicleModel}</p>
-                    <p className="text-sm text-slate-600">{settings.registrationNumber}</p>
+                    <p className="font-semibold">{vehicle.name} ({vehicle.model})</p>
+                    <p className="text-sm text-slate-600">{vehicle.registrationNumber}</p>
                 </div>
             </header>
 

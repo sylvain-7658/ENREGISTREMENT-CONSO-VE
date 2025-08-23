@@ -1,31 +1,48 @@
 
 
-export type View = 'dashboard' | 'journal' | 'trajets' | 'entretien' | 'stats' | 'settings' | 'add-charge' | 'add-trip' | 'add-maintenance';
 
-export interface Vehicle {
+
+
+
+
+
+export type View = 'dashboard' | 'journal' | 'trajets' | 'entretien' | 'stats' | 'settings' | 'add-charge' | 'add-trip' | 'add-maintenance' | 'release-notes' | 'user-guide' | 'legal-info' | 'fleet-overview';
+
+// Type pour les préréglages de véhicules de vehicleData.ts
+export interface VehiclePreset {
   name: string;
   capacity: number;
 }
 
+// Nouveau type pour les véhicules enregistrés par l'utilisateur
+export interface UserVehicle {
+  id: string;
+  name: string; // Nom personnalisé par l'utilisateur
+  model: string; // Modèle du véhicule
+  batteryCapacity: number; // en kWh
+  registrationNumber: string;
+  fiscalPower: number; // in CV
+  accessPin?: string; // Optional 4-digit PIN for vehicle access
+  imageUrl?: string; // Optional URL for the vehicle image (base64 data URL)
+}
+
 export interface Settings {
   recapEmail: string;
-  batteryCapacity: number; // in kWh
-  vehicleModel: string;
-  registrationNumber: string;
+  activeVehicleId?: string | null; // ID du véhicule actuellement sélectionné
+
+  // Tarifs globaux
   pricePeak: number; // price per kWh
   priceOffPeak: number; // price per kWh
-  // Tempo prices
   priceTempoBluePeak: number;
   priceTempoBlueOffPeak: number;
   priceTempoWhitePeak: number;
   priceTempoWhiteOffPeak: number;
   priceTempoRedPeak: number;
   priceTempoRedOffPeak: number;
-  // Gasoline comparison
+  
+  // Comparaison et facturation globales
   gasolineCarConsumption: number; // in L/100km
   gasolinePricePerLiter: number; // in €/L
-  fiscalPower: number; // in CV
-  // Billing
   billingRateLocal: number; // in € for short trips
   billingRateMedium: number; // in € for medium trips
 }
@@ -45,12 +62,14 @@ export enum TariffType {
 
 export interface Charge {
   id: string;
+  vehicleId: string; // Lien vers le véhicule
   date: string; // ISO string format
   startPercentage: number;
   endPercentage?: number;
   odometer: number; // in km
   tariff?: TariffType;
   customPrice?: number; // price per kWh for quick charge
+  pricePerKwh?: number; // The exact price/kWh at the time of charge
   status: 'pending' | 'completed';
 }
 
@@ -58,6 +77,7 @@ export interface ProcessedCharge extends Charge {
   endPercentage: number;
   tariff: TariffType;
   kwhAdded: number;
+  kwhAddedToBattery: number;
   cost: number;
   distanceDriven: number | null;
   consumptionKwh100km: number | null;
@@ -68,6 +88,7 @@ export interface ProcessedCharge extends Charge {
 
 export interface Trip {
   id: string;
+  vehicleId: string; // Lien vers le véhicule
   date: string; // ISO string format
   destination: string;
   client?: string;
@@ -103,6 +124,7 @@ export enum MaintenanceType {
 
 export interface MaintenanceEntry {
   id: string;
+  vehicleId: string; // Lien vers le véhicule
   date: string; // ISO string format
   odometer: number; // in km
   type: MaintenanceType;
@@ -122,12 +144,15 @@ export interface StatsData {
   avgConsumption: number;
   avgCostPer100km: number;
   totalGasolineCost: number;
+  totalSavings: number;
+  avgKwhCost: number;
   slowChargeKwh?: number;
   fastChargeKwh?: number;
   slowChargeCost?: number;
   fastChargeCost?: number;
   slowChargeCount?: number;
   fastChargeCount?: number;
+  co2Saved: number;
 }
 
 export interface TripStatsData {

@@ -19,31 +19,31 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-  try {
-    firebase.analytics();
-  } catch (e) {
-    console.error('Firebase Analytics initialization failed.', e);
-  }
+const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+
+try {
+  firebase.analytics(app);
+} catch (e) {
+  console.error('Firebase Analytics initialization failed.', e);
 }
 
-const auth = firebase.auth();
-const db = firebase.firestore();
+const auth = firebase.auth(app);
+const db = firebase.firestore(app);
 
 // We create a promise that resolves once persistence is enabled.
 // This prevents race conditions where we try to read/write data
-// before the offline cache is ready.
-const firestorePromise = db.enablePersistence({ synchronizeTabs: true })
-  .catch((err) => {
-    if (err.code === 'failed-precondition') {
-      // This can happen if multiple tabs are open.
-      console.warn("Firestore offline persistence failed: multiple tabs open.");
-    } else if (err.code === 'unimplemented') {
-      // The browser may not support all features required for persistence.
-      console.warn("Firestore offline persistence is not supported in this browser.");
-    }
-  });
+// before the offline cache is ready. We gracefully handle errors
+// so that the app can still function online if persistence fails.
+const firestorePromise = db.enablePersistence()
+    .catch((err: any) => {
+        if (err.code === 'failed-precondition') {
+            console.warn('Firestore persistence failed: multiple tabs open.');
+        } else if (err.code === 'unimplemented') {
+            console.warn('Firestore persistence not available in this browser.');
+        } else {
+            console.error('Firestore persistence failed with error:', err);
+        }
+    });
 
 
 export { auth, db, firestorePromise };

@@ -9,6 +9,11 @@ interface AccordionProps {
   startOpen?: boolean;
 }
 
+const accordionVariants = {
+  open: { opacity: 1, height: 'auto' },
+  collapsed: { opacity: 0, height: 0 },
+};
+
 const Accordion = ({ title, children, icon, startOpen = false }: AccordionProps) => {
   const [isOpen, setIsOpen] = useState(startOpen);
 
@@ -32,13 +37,9 @@ const Accordion = ({ title, children, icon, startOpen = false }: AccordionProps)
         {isOpen && (
           <motion.section
             key="content"
-            initial="collapsed"
-            animate="open"
-            exit="collapsed"
-            variants={{
-              open: { opacity: 1, height: 'auto' },
-              collapsed: { opacity: 0, height: 0 },
-            }}
+            initial={accordionVariants.collapsed}
+            animate={accordionVariants.open}
+            exit={accordionVariants.collapsed}
             transition={{ duration: 0.4, ease: [0.04, 0.62, 0.23, 0.98] }}
             className="overflow-hidden"
           >

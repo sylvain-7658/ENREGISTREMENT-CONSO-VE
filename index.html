@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Suivi Conso EV Online</title>
+    <title>SUIVI CONSO-FUN&LEC</title>
     
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#2563eb" />
@@ -41,6 +41,7 @@
       }
       body {
         font-family: 'Inter', sans-serif;
+        transition: background-image 0.3s ease-in-out, background-color 0.3s ease-in-out;
       }
       ::-webkit-scrollbar {
         width: 8px;
@@ -58,6 +59,20 @@
       }
       ::-webkit-scrollbar-thumb:hover {
         background: #64748b; /* slate-500 */
+      }
+      body.dashboard-background {
+        background-color: #000000;
+        background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 640 512' xmlns='http://www.w3.org/2000/svg'%3e%3cpath fill='white' fill-opacity='0.05' d='M571.2,232.8H496.4l-26-40.8c-9.6-15.6-26.4-24-43.2-24H212.4c-16.8,0-33.6,8.4-43.2,24l-26,40.8H68.8 c-34.8,0-62.4,27.6-62.4,62.4v123.6c0,4.8,3.6,8.4,8.4,8.4h33.6c4.8,0,8.4-3.6,8.4-8.4v-25.2h462v25.2c0,4.8,3.6,8.4,8.4,8.4 h33.6c4.8,0,8.4-3.6,8.4-8.4V295.2C633.6,260.4,606,232.8,571.2,232.8z M213.6,193.2c3.6-6,9.6-9.6,16.8-9.6h204 c7.2,0,13.2,3.6,16.8,9.6l18,28.8H195.6L213.6,193.2z M157.2,344.4c-25.2,0-45.6-20.4-45.6-45.6s20.4-45.6,45.6-45.6 s45.6,20.4,45.6,45.6S182.4,344.4,157.2,344.4z M507.6,344.4c-25.2,0-45.6-20.4-45.6-45.6s20.4-45.6,45.6-45.6 s45.6,20.4,45.6,45.6S532.8,344.4,507.6,344.4z' /%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: center 15vh;
+        background-size: 65vmin;
+        background-attachment: fixed;
+      }
+      body.dashboard-background .dashboard-title {
+        color: #ffffff;
+      }
+      body.dashboard-background .dashboard-subtitle {
+        color: #e2e8f0; /* slate-200 */
       }
       @media print {
         .no-print {

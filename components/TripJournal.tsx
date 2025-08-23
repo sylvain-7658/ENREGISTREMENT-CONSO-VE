@@ -11,7 +11,7 @@ import html2canvas from 'html2canvas';
 import MonthlyTripReport from './MonthlyTripReport';
 import AnnualTripReport from './AnnualTripReport';
 import { generateTripStats, generateClientStats, generateDestinationStats } from '../utils/calculations';
-import { ProcessedTrip, Settings, TripStatsData, ClientStats, DestinationStats } from '../types';
+import { ProcessedTrip, Settings, TripStatsData, ClientStats, DestinationStats, UserVehicle } from '../types';
 
 type SubView = 'details' | 'summary' | 'stats';
 
@@ -37,6 +37,7 @@ interface MonthlyReportData {
   clientStats: ClientStats[];
   destinationStats: DestinationStats[];
   settings: Settings;
+  vehicle: UserVehicle;
 }
 
 interface AnnualReportData {
@@ -47,11 +48,12 @@ interface AnnualReportData {
   clientStats: ClientStats[];
   destinationStats: DestinationStats[];
   settings: Settings;
+  vehicle: UserVehicle;
 }
 
 const TripJournal: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('details');
-    const { trips, setActiveView, settings } = useAppContext();
+    const { trips, setActiveView, settings, activeVehicle } = useAppContext();
     const monthlyReportRef = useRef<HTMLDivElement>(null);
     const annualReportRef = useRef<HTMLDivElement>(null);
 
@@ -88,7 +90,7 @@ const TripJournal: React.FC = () => {
     }, [trips]);
 
     const handleGenerateMonthlyReport = async () => {
-        if (!selectedMonthYear) return;
+        if (!selectedMonthYear || !activeVehicle) return;
         setIsGeneratingMonthly(true);
 
         const [year, month] = selectedMonthYear.split('-').map(Number);
@@ -113,6 +115,7 @@ const TripJournal: React.FC = () => {
             clientStats: generateClientStats(tripsForMonth),
             destinationStats: generateDestinationStats(tripsForMonth),
             settings,
+            vehicle: activeVehicle,
         };
         
         setMonthlyReportData(data);
@@ -136,7 +139,7 @@ const TripJournal: React.FC = () => {
     };
 
     const handleGenerateAnnualReport = async () => {
-        if (!selectedYear) return;
+        if (!selectedYear || !activeVehicle) return;
         setIsGeneratingAnnual(true);
         const year = parseInt(selectedYear, 10);
     
@@ -157,6 +160,7 @@ const TripJournal: React.FC = () => {
             clientStats: generateClientStats(tripsForYear),
             destinationStats: generateDestinationStats(tripsForYear),
             settings,
+            vehicle: activeVehicle,
         };
     
         setAnnualReportData(data);

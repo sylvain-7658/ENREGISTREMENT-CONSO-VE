@@ -1,6 +1,4 @@
-
-
-import { Charge, ProcessedCharge, ProcessedTrip, Settings, StatsData, TariffType, Trip, TripStatsData, ClientStats, DestinationStats, MaintenanceEntry, ProcessedMaintenanceEntry } from '../types';
+import { Charge, ProcessedCharge, ProcessedTrip, Settings, StatsData, TariffType, Trip, TripStatsData, ClientStats, DestinationStats, MaintenanceEntry, ProcessedMaintenanceEntry, UserVehicle } from '../types';
 
 // Les tarifs en courant alternatif (AC) sont sujets à des pertes lors de la recharge, de la prise à la batterie.
 const AC_TARIFFS: TariffType[] = [
@@ -16,9 +14,11 @@ const AC_TARIFFS: TariffType[] = [
 ];
 // Nous appliquons une perte d'énergie de 12% pour la recharge en AC.
 const CHARGING_LOSS_FACTOR = 1.12;
+const CO2_PER_LITER_GASOLINE = 2.31; // kg CO2 per liter of gasoline
 
 
-export const processCharges = (charges: Charge[], settings: Settings): ProcessedCharge[] => {
+export const processCharges = (charges: Charge[], settings: Settings, vehicle: UserVehicle): ProcessedCharge[] => {
+  if (!vehicle) return [];
   const completedCharges = charges.filter(
     (c): c is Charge & { endPercentage: number; tariff: TariffType } =>
       c.status === 'completed' && c.endPercentage != null && c.tariff != null
@@ -32,24 +32,30 @@ export const processCharges = (charges: Charge[], settings: Settings): Processed
 
       // --- Base calculations for the current charge ---
       const percentAdded = charge.endPercentage - charge.startPercentage;
-      const kwhAddedToBattery = (percentAdded / 100) * settings.batteryCapacity;
+      const kwhAddedToBattery = (percentAdded / 100) * vehicle.batteryCapacity;
       const kwhDrawnFromGrid = AC_TARIFFS.includes(charge.tariff)
           ? kwhAddedToBattery * CHARGING_LOSS_FACTOR
           : kwhAddedToBattery;
 
       let pricePerKwh: number;
-      switch (charge.tariff) {
-        case TariffType.PEAK: pricePerKwh = settings.pricePeak; break;
-        case TariffType.OFF_PEAK: pricePerKwh = settings.priceOffPeak; break;
-        case TariffType.TEMPO_BLUE_PEAK: pricePerKwh = settings.priceTempoBluePeak; break;
-        case TariffType.TEMPO_BLUE_OFFPEAK: pricePerKwh = settings.priceTempoBlueOffPeak; break;
-        case TariffType.TEMPO_WHITE_PEAK: pricePerKwh = settings.priceTempoWhitePeak; break;
-        case TariffType.TEMPO_WHITE_OFFPEAK: pricePerKwh = settings.priceTempoWhiteOffPeak; break;
-        case TariffType.TEMPO_RED_PEAK: pricePerKwh = settings.priceTempoRedPeak; break;
-        case TariffType.TEMPO_RED_OFFPEAK: pricePerKwh = settings.priceTempoRedOffPeak; break;
-        case TariffType.QUICK_CHARGE: pricePerKwh = charge.customPrice || 0; break;
-        case TariffType.FREE_CHARGE: pricePerKwh = 0; break;
-        default: pricePerKwh = 0;
+      // Prioritize the price snapshotted at the time of charge creation.
+      if (charge.pricePerKwh != null) {
+          pricePerKwh = charge.pricePerKwh;
+      } else {
+          // Fallback for old data: look up from current settings.
+          switch (charge.tariff) {
+            case TariffType.PEAK: pricePerKwh = settings.pricePeak; break;
+            case TariffType.OFF_PEAK: pricePerKwh = settings.priceOffPeak; break;
+            case TariffType.TEMPO_BLUE_PEAK: pricePerKwh = settings.priceTempoBluePeak; break;
+            case TariffType.TEMPO_BLUE_OFFPEAK: pricePerKwh = settings.priceTempoBlueOffPeak; break;
+            case TariffType.TEMPO_WHITE_PEAK: pricePerKwh = settings.priceTempoWhitePeak; break;
+            case TariffType.TEMPO_WHITE_OFFPEAK: pricePerKwh = settings.priceTempoWhiteOffPeak; break;
+            case TariffType.TEMPO_RED_PEAK: pricePerKwh = settings.priceTempoRedPeak; break;
+            case TariffType.TEMPO_RED_OFFPEAK: pricePerKwh = settings.priceTempoRedOffPeak; break;
+            case TariffType.QUICK_CHARGE: pricePerKwh = charge.customPrice || 0; break;
+            case TariffType.FREE_CHARGE: pricePerKwh = 0; break;
+            default: pricePerKwh = 0;
+          }
       }
 
       const cost = kwhDrawnFromGrid * pricePerKwh;
@@ -72,7 +78,7 @@ export const processCharges = (charges: Charge[], settings: Settings): Processed
           distanceDriven = charge.odometer - prevChargeRaw.odometer;
 
           if (distanceDriven > 0) {
-              const prevKwhAddedToBattery = (prevChargeRaw.endPercentage - prevChargeRaw.startPercentage) / 100 * settings.batteryCapacity;
+              const prevKwhAddedToBattery = (prevChargeRaw.endPercentage - prevChargeRaw.startPercentage) / 100 * vehicle.batteryCapacity;
               consumptionKwh100km = (prevKwhAddedToBattery / distanceDriven) * 100;
               costPer100km = (prevChargeProcessed.cost / distanceDriven) * 100;
           }
@@ -81,8 +87,9 @@ export const processCharges = (charges: Charge[], settings: Settings): Processed
       processedResult.push({
           ...charge,
           kwhAdded: parseFloat(kwhDrawnFromGrid.toFixed(2)),
+          kwhAddedToBattery: parseFloat(kwhAddedToBattery.toFixed(2)),
           cost: parseFloat(cost.toFixed(2)),
-          pricePerKwh: parseFloat(pricePerKwh.toFixed(4)),
+          pricePerKwh: parseFloat(pricePerKwh.toFixed(2)),
           distanceDriven,
           consumptionKwh100km: consumptionKwh100km ? parseFloat(consumptionKwh100km.toFixed(2)) : null,
           gasolineEquivalentKm,
@@ -100,10 +107,14 @@ const getWeek = (date: Date) => {
   return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
 };
 
-export const generateStats = (charges: ProcessedCharge[], period: 'weekly' | 'monthly' | 'yearly', settings: Settings, filterTariffs?: TariffType[]): StatsData[] => {
+export const generateStats = (charges: ProcessedCharge[], period: 'weekly' | 'monthly' | 'yearly', settings: Settings, vehicle: UserVehicle | null, filterTariffs?: TariffType[]): StatsData[] => {
+  if (!vehicle) return [];
   const chargesToProcess = filterTariffs && filterTariffs.length > 0
     ? charges.filter(charge => filterTariffs.includes(charge.tariff))
     : charges;
+    
+  const allChargesSorted = [...charges].sort((a, b) => a.odometer - b.odometer);
+  const chargeMap = new Map(allChargesSorted.map((c, i) => [c.id, { charge: c, index: i }]));
 
   const groups: { [key: string]: { charges: ProcessedCharge[] } } = {};
 
@@ -128,8 +139,7 @@ export const generateStats = (charges: ProcessedCharge[], period: 'weekly' | 'mo
     const groupCharges = groups[key].charges;
     const totalKwh = groupCharges.reduce((sum, c) => sum + c.kwhAdded, 0);
     const totalCost = groupCharges.reduce((sum, c) => sum + c.cost, 0);
-    const totalDistance = groupCharges.reduce((sum, c) => sum + (c.distanceDriven || 0), 0);
-    const totalTripCost = groupCharges.reduce((sum, c) => sum + ((c.costPer100km || 0) * (c.distanceDriven || 0) / 100), 0);
+    const avgKwhCost = totalKwh > 0 ? totalCost / totalKwh : 0;
     
     const kwhPerTariff: { [key in TariffType]?: number } = {};
     const costPerTariff: { [key in TariffType]?: number } = {};
@@ -144,13 +154,42 @@ export const generateStats = (charges: ProcessedCharge[], period: 'weekly' | 'mo
     for (const tariff of Object.keys(costPerTariff) as TariffType[]) {
         costPerTariff[tariff] = parseFloat(costPerTariff[tariff]!.toFixed(2));
     }
+    
+    // Correctly calculate trip-related stats by linking a charge to the trip it fuels.
+    let totalDistanceFueledByGroup = 0;
+    let totalKwhConsumedFromGroup = 0;
+    let totalCostOfTripsFueledByGroup = 0;
 
-    const avgConsumption = totalDistance > 0 ? (totalKwh / totalDistance) * 100 : 0;
-    const avgCostPer100km = totalDistance > 0 ? (totalTripCost / totalDistance) * 100 : 0;
+    groupCharges.forEach(chargeInGroup => {
+        const chargeInfo = chargeMap.get(chargeInGroup.id);
+        if (chargeInfo) {
+            const { index } = chargeInfo;
+            if (index < allChargesSorted.length - 1) {
+                const nextCharge = allChargesSorted[index + 1];
+                const distance = nextCharge.distanceDriven;
+                if (distance && distance > 0) {
+                    totalDistanceFueledByGroup += distance;
+                    totalKwhConsumedFromGroup += chargeInGroup.kwhAddedToBattery;
+                    totalCostOfTripsFueledByGroup += chargeInGroup.cost;
+                }
+            }
+        }
+    });
+
+    const avgConsumption = totalDistanceFueledByGroup > 0 ? (totalKwhConsumedFromGroup / totalDistanceFueledByGroup) * 100 : 0;
+    const avgCostPer100km = totalDistanceFueledByGroup > 0 ? (totalCostOfTripsFueledByGroup / totalDistanceFueledByGroup) * 100 : 0;
 
     let totalGasolineCost = 0;
-    if (totalDistance > 0 && settings.gasolineCarConsumption > 0 && settings.gasolinePricePerLiter > 0) {
-        totalGasolineCost = (totalDistance / 100) * settings.gasolineCarConsumption * settings.gasolinePricePerLiter;
+    if (totalDistanceFueledByGroup > 0 && settings.gasolineCarConsumption > 0 && settings.gasolinePricePerLiter > 0) {
+        totalGasolineCost = (totalDistanceFueledByGroup / 100) * settings.gasolineCarConsumption * settings.gasolinePricePerLiter;
+    }
+
+    const totalSavings = totalGasolineCost - totalCost;
+
+    let totalCo2Saved = 0;
+    if (totalDistanceFueledByGroup > 0 && settings.gasolineCarConsumption > 0) {
+        const totalLitersGasoline = (totalDistanceFueledByGroup / 100) * settings.gasolineCarConsumption;
+        totalCo2Saved = totalLitersGasoline * CO2_PER_LITER_GASOLINE;
     }
 
     let slowChargeKwh = 0;
@@ -178,16 +217,19 @@ export const generateStats = (charges: ProcessedCharge[], period: 'weekly' | 'mo
       kwhPerTariff,
       costPerTariff,
       totalCost: parseFloat(totalCost.toFixed(2)),
-      totalDistance: parseFloat(totalDistance.toFixed(0)),
+      totalDistance: parseFloat(totalDistanceFueledByGroup.toFixed(0)),
       avgConsumption: parseFloat(avgConsumption.toFixed(2)),
       avgCostPer100km: parseFloat(avgCostPer100km.toFixed(2)),
       totalGasolineCost: parseFloat(totalGasolineCost.toFixed(2)),
+      totalSavings: parseFloat(totalSavings.toFixed(2)),
+      avgKwhCost: parseFloat(avgKwhCost.toFixed(2)),
       slowChargeKwh: parseFloat(slowChargeKwh.toFixed(2)),
       fastChargeKwh: parseFloat(fastChargeKwh.toFixed(2)),
       slowChargeCost: parseFloat(slowChargeCost.toFixed(2)),
       fastChargeCost: parseFloat(fastChargeCost.toFixed(2)),
       slowChargeCount,
       fastChargeCount,
+      co2Saved: parseFloat(totalCo2Saved.toFixed(2)),
     };
   });
   
@@ -234,7 +276,8 @@ export const generateTripStats = (trips: ProcessedTrip[], period: 'weekly' | 'mo
 };
 
 
-export const processTrips = (trips: Trip[], settings: Settings, charges: ProcessedCharge[]): ProcessedTrip[] => {
+export const processTrips = (trips: Trip[], settings: Settings, vehicle: UserVehicle, charges: ProcessedCharge[]): ProcessedTrip[] => {
+  if (!vehicle) return [];
   const completedTrips = trips.filter(
     (t): t is Trip & { endOdometer: number; endPercentage: number } =>
       t.status === 'completed' && t.endOdometer != null && t.endPercentage != null
@@ -263,7 +306,7 @@ export const processTrips = (trips: Trip[], settings: Settings, charges: Process
     }
 
     const percentConsumed = trip.startPercentage - trip.endPercentage;
-    const kwhConsumed = (percentConsumed / 100) * settings.batteryCapacity;
+    const kwhConsumed = (percentConsumed / 100) * vehicle.batteryCapacity;
     const cost = kwhConsumed * pricePerKwh;
     const consumptionKwh100km = (kwhConsumed / distance) * 100;
 
@@ -281,7 +324,7 @@ export const processTrips = (trips: Trip[], settings: Settings, charges: Process
         } else if (distance >= 11 && distance <= 30) {
             billingAmount = settings.billingRateMedium;
         } else { // distance > 30
-            const fiscalPower = settings.fiscalPower || 4;
+            const fiscalPower = vehicle.fiscalPower || 4;
             let rate = 0;
             if (fiscalPower <= 3) {
                 rate = 0.529;

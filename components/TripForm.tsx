@@ -1,11 +1,10 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { Trip } from '../types';
 import Card from './Card';
 import { GoogleGenAI, Type } from '@google/genai';
-import { Camera, X, Loader2 } from 'lucide-react';
+import { Camera, X, Loader2, Map as MapIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const FormField = ({ label, id, children }: { label: string; id: string; children: React.ReactNode }) => (
@@ -19,6 +18,16 @@ const Input = (props: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input {...props} className="block w-full p-2 border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"/>
 );
 
+const modalBackdropVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1 },
+};
+
+const modalContentVariants = {
+    hidden: { scale: 0.9, y: 20 },
+    visible: { scale: 1, y: 0 },
+};
+
 const CameraModal = ({ isOpen, onClose, onCapture, isAnalyzing }: { isOpen: boolean, onClose: () => void, onCapture: (data: string) => void, isAnalyzing: boolean }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -28,14 +37,21 @@ const CameraModal = ({ isOpen, onClose, onCapture, isAnalyzing }: { isOpen: bool
         const startCamera = async () => {
             if (isOpen && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                     const constraints = {
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1920 },
+                            height: { ideal: 1080 },
+                        }
+                    };
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
                     streamRef.current = stream;
                     if (videoRef.current) {
                         videoRef.current.srcObject = stream;
                     }
                 } catch (err) {
                     console.error("Error accessing camera: ", err);
-                    alert("Impossible d'accéder à la caméra. Veuillez vérifier les autorisations de votre navigateur.");
+                    alert("Impossible d'accéder à la caméra. Veuillez vérifier les autorisations et les capacités de votre appareil.");
                     onClose();
                 }
             }
@@ -58,7 +74,7 @@ const CameraModal = ({ isOpen, onClose, onCapture, isAnalyzing }: { isOpen: bool
             canvas.height = video.videoHeight;
             const context = canvas.getContext('2d');
             context?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
-            onCapture(canvas.toDataURL('image/jpeg'));
+            onCapture(canvas.toDataURL('image/jpeg', 0.95));
         }
     };
     
@@ -66,15 +82,15 @@ const CameraModal = ({ isOpen, onClose, onCapture, isAnalyzing }: { isOpen: bool
         <AnimatePresence>
             {isOpen && (
                 <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
+                    initial={modalBackdropVariants.hidden}
+                    animate={modalBackdropVariants.visible}
+                    exit={modalBackdropVariants.hidden}
                     className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
                 >
                     <motion.div
-                        initial={{ scale: 0.9, y: 20 }}
-                        animate={{ scale: 1, y: 0 }}
-                        exit={{ scale: 0.9, y: 20 }}
+                        initial={modalContentVariants.hidden}
+                        animate={modalContentVariants.visible}
+                        exit={modalContentVariants.hidden}
                         className="relative w-full max-w-2xl bg-slate-800 rounded-lg overflow-hidden"
                     >
                          {isAnalyzing && (
@@ -86,6 +102,9 @@ const CameraModal = ({ isOpen, onClose, onCapture, isAnalyzing }: { isOpen: bool
                         )}
                         <video ref={videoRef} autoPlay playsInline muted className="w-full h-auto"></video>
                         <canvas ref={canvasRef} className="hidden"></canvas>
+                        <div className="absolute top-4 left-4 right-4 text-center text-white text-sm bg-black/40 p-2 rounded-lg">
+                           <p>Tenez votre téléphone horizontalement pour un meilleur résultat.</p>
+                        </div>
                         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/50 to-transparent flex justify-center">
                            <button onClick={handleTakePhoto} className="p-4 bg-white rounded-full shadow-lg" aria-label="Prendre une photo">
                                <Camera size={24} className="text-slate-800" />
@@ -101,6 +120,17 @@ const CameraModal = ({ isOpen, onClose, onCapture, isAnalyzing }: { isOpen: bool
     );
 };
 
+const getDistance = (coords1: GeolocationCoordinates, coords2: GeolocationCoordinates): number => {
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (coords2.latitude - coords1.latitude) * Math.PI / 180;
+    const dLon = (coords2.longitude - coords1.longitude) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(coords1.latitude * Math.PI / 180) * Math.cos(coords2.latitude * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+};
+
 const TripForm: React.FC = () => {
     const { addTrip, startTrip } = useAppContext();
     const { currentUser } = useAuth();
@@ -110,7 +140,7 @@ const TripForm: React.FC = () => {
     const [destination, setDestination] = useState('');
     const [client, setClient] = useState('');
     const [startOdometer, setStartOdometer] = useState('');
-    const [endOdometer, setEndOdometer] = useState('');
+    const [distance, setDistance] = useState('');
     const [startPercentage, setStartPercentage] = useState('');
     const [endPercentage, setEndPercentage] = useState('');
     const [isBilled, setIsBilled] = useState(false);
@@ -118,17 +148,33 @@ const TripForm: React.FC = () => {
     const [isCameraOpen, setIsCameraOpen] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+    // GPS Tracking State
+    const [isTracking, setIsTracking] = useState(false);
+    const [watchId, setWatchId] = useState<number | null>(null);
+    const [positions, setPositions] = useState<GeolocationCoordinates[]>([]);
+    const [trackingError, setTrackingError] = useState('');
+    const [liveDistance, setLiveDistance] = useState(0);
+
     const resetForm = () => {
         setDestination('');
         setClient('');
         setStartOdometer('');
-        setEndOdometer('');
+        setDistance('');
         setStartPercentage('');
         setEndPercentage('');
         setIsBilled(false);
         setError('');
+        
+        if (isTracking && watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+        }
+        setIsTracking(false);
+        setWatchId(null);
+        setPositions([]);
+        setTrackingError('');
+        setLiveDistance(0);
     };
-    
+
     const analyzeDashboardImage = async (base64Image: string) => {
         setIsAnalyzing(true);
         setError('');
@@ -202,7 +248,7 @@ const TripForm: React.FC = () => {
             setError('Le kilométrage doit être positif.'); return;
         }
         
-        const tripData: Omit<Trip, 'id' | 'status' | 'endOdometer' | 'endPercentage'> = {
+        const tripData: Omit<Trip, 'id' | 'status' | 'endOdometer' | 'endPercentage' | 'vehicleId'> = {
             date,
             destination: destination.trim(),
             startOdometer: startOdo,
@@ -219,15 +265,70 @@ const TripForm: React.FC = () => {
         resetForm();
     };
 
+    const handleStartTracking = () => {
+        if (!navigator.geolocation) {
+            setTrackingError("La géolocalisation n'est pas supportée par votre navigateur.");
+            return;
+        }
+
+        setTrackingError('');
+        setPositions([]);
+        setLiveDistance(0);
+        setDistance('');
+        setIsTracking(true);
+
+        const id = navigator.geolocation.watchPosition(
+            (position) => {
+                setPositions(prev => {
+                    const newPositions = [...prev, position.coords];
+                    if (newPositions.length > 1) {
+                        let totalDist = 0;
+                        for (let i = 0; i < newPositions.length - 1; i++) {
+                            totalDist += getDistance(newPositions[i], newPositions[i + 1]);
+                        }
+                        setLiveDistance(totalDist);
+                    }
+                    return newPositions;
+                });
+            },
+            (error) => {
+                let message = "Erreur de géolocalisation.";
+                if (error.code === 1) message = "Veuillez autoriser l'accès à votre position.";
+                if (error.code === 2) message = "Position non disponible.";
+                if (error.code === 3) message = "Timeout de la requête de position.";
+                setTrackingError(message);
+                setIsTracking(false);
+            },
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+        setWatchId(id);
+    };
+
+    const handleStopTracking = () => {
+        if (watchId !== null) {
+            navigator.geolocation.clearWatch(watchId);
+        }
+        setIsTracking(false);
+        setWatchId(null);
+        if (positions.length > 1) {
+            let totalDist = 0;
+            for (let i = 0; i < positions.length - 1; i++) {
+                totalDist += getDistance(positions[i], positions[i + 1]);
+            }
+            setDistance(totalDist.toFixed(2));
+        }
+    };
+
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         const startOdo = parseInt(startOdometer, 10);
-        const endOdo = parseInt(endOdometer, 10);
+        const dist = parseFloat(distance);
         const startPerc = parseInt(startPercentage, 10);
         const endPerc = parseInt(endPercentage, 10);
 
-        if (isNaN(startOdo) || isNaN(endOdo) || isNaN(startPerc) || isNaN(endPerc) || !destination.trim()) {
+        if (isNaN(startOdo) || isNaN(dist) || isNaN(startPerc) || isNaN(endPerc) || !destination.trim()) {
             setError('Veuillez remplir tous les champs avec des données valides.');
             return;
         }
@@ -235,16 +336,18 @@ const TripForm: React.FC = () => {
             setError('Le pourcentage doit être entre 0 et 100.');
             return;
         }
-        if (endOdo <= startOdo) {
-            setError('Le kilométrage d\'arrivée doit être supérieur à celui de départ.');
+        if (dist <= 0) {
+            setError("La distance doit être un nombre positif.");
             return;
         }
+        const endOdo = startOdo + dist;
+
         if (endPerc >= startPerc) {
             setError('Le pourcentage à l\'arrivée doit être inférieur à celui de départ.');
             return;
         }
 
-        const newTrip: Omit<Trip, 'id' | 'status'> = {
+        const newTrip: Omit<Trip, 'id' | 'status' | 'vehicleId'> = {
             date,
             destination: destination.trim(),
             startOdometer: startOdo,
@@ -287,6 +390,7 @@ const TripForm: React.FC = () => {
                 <FormField label="Client (optionnel)" id="client">
                     <Input type="text" id="client" placeholder="ex: Acme Corp" value={client} onChange={e => setClient(e.target.value)} />
                 </FormField>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField label="Kilométrage départ (km)" id="startOdometer">
                          <div className="relative">
@@ -296,16 +400,47 @@ const TripForm: React.FC = () => {
                             </button>
                         </div>
                     </FormField>
-                    <FormField label="Kilométrage arrivée (km)" id="endOdometer">
-                        <Input type="number" id="endOdometer" placeholder="ex: 45155" value={endOdometer} onChange={e => setEndOdometer(e.target.value)} />
-                    </FormField>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <FormField label="Batterie au départ (%)" id="startPercentage">
+                    <FormField label="Batterie au départ (%)" id="startPercentage">
                         <Input type="number" id="startPercentage" placeholder="ex: 80" value={startPercentage} onChange={e => setStartPercentage(e.target.value)} required/>
                     </FormField>
+                </div>
+
+                <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-lg">
+                    <h3 className="font-semibold text-slate-700 dark:text-slate-200 mb-2 flex items-center gap-2">
+                        <MapIcon size={18} className="text-blue-500"/>
+                        Suivi GPS du trajet
+                    </h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
+                        Calculez la distance automatiquement. Pour un suivi précis, gardez cet onglet ouvert durant le trajet.
+                    </p>
+                    <div className="flex flex-col sm:flex-row items-center gap-4">
+                        <button 
+                            type="button" 
+                            onClick={isTracking ? handleStopTracking : handleStartTracking}
+                            className={`w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-2 font-semibold rounded-lg shadow-sm transition-colors ${
+                                isTracking 
+                                ? 'bg-red-500 hover:bg-red-600 text-white' 
+                                : 'bg-blue-600 hover:bg-blue-700 text-white'
+                            }`}
+                        >
+                            {isTracking ? <Loader2 size={16} className="animate-spin" /> : <MapIcon size={16} />}
+                            <span>{isTracking ? 'Arrêter le suivi' : 'Démarrer le suivi'}</span>
+                        </button>
+                        {isTracking && (
+                             <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                                Distance actuelle : {liveDistance.toFixed(2)} km
+                            </p>
+                        )}
+                    </div>
+                     {trackingError && <p className="text-red-500 text-sm font-semibold mt-2">{trackingError}</p>}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField label="Distance du trajet (km)" id="distance">
+                        <Input type="number" step="0.1" id="distance" placeholder="ex: 35.5" value={distance} onChange={e => setDistance(e.target.value)} required/>
+                    </FormField>
                     <FormField label="Batterie à l'arrivée (%)" id="endPercentage">
-                        <Input type="number" id="endPercentage" placeholder="ex: 72" value={endPercentage} onChange={e => setEndPercentage(e.target.value)} />
+                        <Input type="number" id="endPercentage" placeholder="ex: 72" value={endPercentage} onChange={e => setEndPercentage(e.target.value)} required/>
                     </FormField>
                 </div>
 

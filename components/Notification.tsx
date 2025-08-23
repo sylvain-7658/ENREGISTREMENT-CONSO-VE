@@ -8,6 +8,12 @@ interface NotificationProps {
   onClose: () => void;
 }
 
+const notificationVariants = {
+  initial: { opacity: 0, y: 50, scale: 0.3 },
+  animate: { opacity: 1, y: 0, scale: 1 },
+  exit: { opacity: 0, y: 20, scale: 0.9, transition: { duration: 0.2 } },
+};
+
 const Notification: React.FC<NotificationProps> = ({ message, type, onClose }) => {
   const isWarning = type === 'warning';
   
@@ -18,9 +24,9 @@ const Notification: React.FC<NotificationProps> = ({ message, type, onClose }) =
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 50, scale: 0.3 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: 20, scale: 0.9, transition: { duration: 0.2 } }}
+      initial={notificationVariants.initial}
+      animate={notificationVariants.animate}
+      exit={notificationVariants.exit}
       transition={{ type: 'spring', stiffness: 200, damping: 20 }}
       className={`fixed bottom-4 right-4 z-50 max-w-sm w-full p-4 rounded-lg shadow-lg border ${colors} no-print`}
       role="alert"

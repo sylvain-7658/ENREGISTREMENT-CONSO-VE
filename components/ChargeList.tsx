@@ -79,26 +79,27 @@ const SummarySection: React.FC<{
 };
 
 const ChargeList: React.FC = () => {
-    const { charges, settings } = useAppContext();
+    const { charges, settings, activeVehicle } = useAppContext();
     const { currentUser } = useAuth();
     const [period, setPeriod] = useState<Period>('monthly');
     const vehicleInfoText = useMemo(() => {
-        if (settings.registrationNumber) {
-            return `${settings.vehicleModel} (${settings.registrationNumber})`;
+        if (!activeVehicle) return '';
+        if (activeVehicle.registrationNumber) {
+            return `${activeVehicle.name} (${activeVehicle.registrationNumber})`;
         }
-        return settings.vehicleModel;
-    }, [settings.vehicleModel, settings.registrationNumber]);
+        return activeVehicle.name;
+    }, [activeVehicle]);
 
     const globalStatsData = useMemo(() => {
         if (charges.length < 1) return [];
-        return generateStats(charges, period, settings);
-    }, [charges, period, settings]);
+        return generateStats(charges, period, settings, activeVehicle);
+    }, [charges, period, settings, activeVehicle]);
 
     const hpHcStatsData = useMemo(() => {
         if (charges.length < 1) return [];
         const peakOffPeakTariffs = [TariffType.PEAK, TariffType.OFF_PEAK];
-        return generateStats(charges, period, settings, peakOffPeakTariffs);
-    }, [charges, period, settings]);
+        return generateStats(charges, period, settings, activeVehicle, peakOffPeakTariffs);
+    }, [charges, period, settings, activeVehicle]);
 
     const tempoStatsData = useMemo(() => {
         if (charges.length < 1) return [];
@@ -110,14 +111,14 @@ const ChargeList: React.FC = () => {
             TariffType.TEMPO_RED_PEAK,
             TariffType.TEMPO_RED_OFFPEAK,
         ];
-        return generateStats(charges, period, settings, tempoTariffs);
-    }, [charges, period, settings]);
+        return generateStats(charges, period, settings, activeVehicle, tempoTariffs);
+    }, [charges, period, settings, activeVehicle]);
 
     const quickChargeStatsData = useMemo(() => {
         if (charges.length < 1) return [];
         const quickChargeTariffs = [TariffType.QUICK_CHARGE];
-        return generateStats(charges, period, settings, quickChargeTariffs);
-    }, [charges, period, settings]);
+        return generateStats(charges, period, settings, activeVehicle, quickChargeTariffs);
+    }, [charges, period, settings, activeVehicle]);
 
     const periodOptions: {key: Period, label: string}[] = [
         { key: 'weekly', label: 'Semaine' },

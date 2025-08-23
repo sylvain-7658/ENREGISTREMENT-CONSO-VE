@@ -1,6 +1,6 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
-import { ProcessedTrip, Settings, TripStatsData, ClientStats, DestinationStats } from '../types';
+import { ProcessedTrip, Settings, TripStatsData, ClientStats, DestinationStats, UserVehicle } from '../types';
 
 interface ReportData {
   year: number;
@@ -10,6 +10,7 @@ interface ReportData {
   clientStats: ClientStats[];
   destinationStats: DestinationStats[];
   settings: Settings;
+  vehicle: UserVehicle;
 }
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f97316', '#a855f7', '#ef4444', '#64748b'];
@@ -22,7 +23,7 @@ const ReportStat = ({ title, value }: { title: string; value: string; }) => (
 );
 
 const AnnualTripReport: React.FC<{ data: ReportData }> = ({ data }) => {
-    const { year, annualStats, monthlyBreakdown, clientStats, destinationStats, settings } = data;
+    const { year, annualStats, monthlyBreakdown, clientStats, destinationStats, settings, vehicle } = data;
 
     const topDestinations = destinationStats.sort((a, b) => b.tripCount - a.tripCount).slice(0, 5);
     const topClients = clientStats.filter(c => c.totalBillingAmount > 0).sort((a, b) => b.totalBillingAmount - a.totalBillingAmount).slice(0, 5);
@@ -41,8 +42,8 @@ const AnnualTripReport: React.FC<{ data: ReportData }> = ({ data }) => {
                     <p className="text-lg font-semibold text-blue-600">Année {year}</p>
                 </div>
                 <div className="text-right">
-                    <p className="font-semibold">{settings.vehicleModel}</p>
-                    <p className="text-sm text-slate-600">{settings.registrationNumber}</p>
+                    <p className="font-semibold">{vehicle.name} ({vehicle.model})</p>
+                    <p className="text-sm text-slate-600">{vehicle.registrationNumber}</p>
                 </div>
             </header>
 

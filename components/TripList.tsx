@@ -12,7 +12,7 @@ import html2canvas from 'html2canvas';
 const ITEMS_PER_PAGE = 10;
 
 const TripList: React.FC = () => {
-    const { trips, deleteTrip, settings, importTrips } = useAppContext();
+    const { trips, deleteTrip, settings, importTrips, activeVehicle } = useAppContext();
     const { currentUser } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isExportingPdf, setIsExportingPdf] = useState(false);
@@ -29,8 +29,8 @@ const TripList: React.FC = () => {
             alert("Veuillez configurer une adresse e-mail valide dans les Paramètres pour envoyer une facture.");
             return;
         }
-        if (!currentUser) {
-            alert("Utilisateur non trouvé.");
+        if (!currentUser || !activeVehicle) {
+            alert("Utilisateur ou véhicule non trouvé.");
             return;
         }
 
@@ -48,8 +48,8 @@ Informations sur le trajet :
 - Kilométrage : ${trip.startOdometer.toLocaleString('fr-FR')} km → ${trip.endOdometer.toLocaleString('fr-FR')} km
 
 Informations sur le véhicule :
-- Modèle : ${settings.vehicleModel}
-- Immatriculation : ${settings.registrationNumber || 'N/A'}
+- Modèle : ${activeVehicle.name} (${activeVehicle.model})
+- Immatriculation : ${activeVehicle.registrationNumber || 'N/A'}
 
 Montant de la facturation :
 - Total : ${trip.billingAmount?.toFixed(2)} €
@@ -167,7 +167,7 @@ ${currentUser.displayName || currentUser.email}
                 'facturé': 'isBilled'
             };
 
-            const tripsToImport: Omit<Trip, 'id'>[] = [];
+            const tripsToImport: Omit<Trip, 'id' | 'vehicleId'>[] = [];
             const errors: string[] = [];
             
             jsonData.forEach((rawRow, index) => {
@@ -216,7 +216,7 @@ ${currentUser.displayName || currentUser.email}
                     isBilled = true;
                 }
 
-                const newTrip: Omit<Trip, 'id'> = {
+                const newTrip: Omit<Trip, 'id' | 'vehicleId'> = {
                     date: tripDateStr,
                     destination: String(destination),
                     startOdometer: startOdoNum,

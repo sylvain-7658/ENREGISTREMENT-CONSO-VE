@@ -24,11 +24,11 @@ const TARIFF_COLORS: { [key in TariffType]: string } = {
 };
 
 const Stats: React.FC = () => {
-    const { charges, settings } = useAppContext();
+    const { charges, settings, activeVehicle } = useAppContext();
     const [period, setPeriod] = useState<Period>('monthly');
 
-    const statsData = useMemo(() => generateStats(charges, period, settings), [charges, period, settings]);
-    const vehicleInfoText = [settings.vehicleModel, settings.registrationNumber].filter(Boolean).join(' - ');
+    const statsData = useMemo(() => generateStats(charges, period, settings, activeVehicle), [charges, period, settings, activeVehicle]);
+    const vehicleInfoText = activeVehicle ? [activeVehicle.name, activeVehicle.registrationNumber].filter(Boolean).join(' - ') : '';
 
     const hp_hc_tariffs = [TariffType.PEAK, TariffType.OFF_PEAK];
     const tempo_tariffs = [
@@ -41,9 +41,9 @@ const Stats: React.FC = () => {
     ];
     const quick_charge_tariffs = [TariffType.QUICK_CHARGE];
     
-    const hp_hc_stats = useMemo(() => generateStats(charges, period, settings, hp_hc_tariffs).filter(d => d.totalCost > 0), [charges, period, settings]);
-    const tempo_stats = useMemo(() => generateStats(charges, period, settings, tempo_tariffs).filter(d => d.totalCost > 0), [charges, period, settings]);
-    const quick_charge_stats = useMemo(() => generateStats(charges, period, settings, quick_charge_tariffs).filter(d => d.totalCost > 0), [charges, period, settings]);
+    const hp_hc_stats = useMemo(() => generateStats(charges, period, settings, activeVehicle, hp_hc_tariffs).filter(d => d.totalCost > 0), [charges, period, settings, activeVehicle]);
+    const tempo_stats = useMemo(() => generateStats(charges, period, settings, activeVehicle, tempo_tariffs).filter(d => d.totalCost > 0), [charges, period, settings, activeVehicle]);
+    const quick_charge_stats = useMemo(() => generateStats(charges, period, settings, activeVehicle, quick_charge_tariffs).filter(d => d.totalCost > 0), [charges, period, settings, activeVehicle]);
 
 
     const existingTariffs = useMemo(() => {
@@ -125,7 +125,7 @@ const Stats: React.FC = () => {
                 <div className="text-center py-16">
                     <BarChart3 size={48} className="mx-auto text-slate-400" />
                     <h2 className="text-xl font-bold mt-4 mb-2 text-slate-800 dark:text-slate-100">Statistiques indisponibles</h2>
-                    <p className="text-slate-500 dark:text-slate-400">Veuillez ajouter au moins deux recharges pour commencer à voir vos statistiques.</p>
+                    <p className="text-slate-500 dark:text-slate-400">Veuillez ajouter au moins deux recharges pour ce véhicule pour commencer à voir ses statistiques.</p>
                 </div>
             </Card>
         );

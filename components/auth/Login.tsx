@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
 const Login: React.FC = () => {
@@ -8,6 +8,13 @@ const Login: React.FC = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const { signup, login } = useAuth();
+
+    useEffect(() => {
+        document.body.classList.add('dashboard-background');
+        return () => {
+            document.body.classList.remove('dashboard-background');
+        };
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -42,7 +49,7 @@ const Login: React.FC = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 px-4">
+        <div className="min-h-screen flex items-center justify-center px-4">
             <div className="max-w-md w-full bg-white dark:bg-slate-800 shadow-xl rounded-2xl p-8 space-y-6 border border-slate-200/80 dark:border-slate-700/80">
                 <div className="text-center">
                     <div className="flex justify-center items-center mb-4">

@@ -1,5 +1,5 @@
 {
-  "name": "SUIVI CONSO EV ONLINE V5",
+  "name": "SUIVI CONSO-FUN&LEC v6",
   "description": "Une application pour suivre la consommation et les coûts de recharge d'un véhicule électrique.",
   "requestFramePermissions": [
     "camera"

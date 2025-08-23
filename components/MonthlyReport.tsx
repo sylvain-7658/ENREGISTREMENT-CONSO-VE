@@ -1,6 +1,6 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { ProcessedCharge, Settings, StatsData, TariffType, MaintenanceEntry } from '../types';
+import { ProcessedCharge, Settings, StatsData, TariffType, MaintenanceEntry, UserVehicle } from '../types';
 
 const TARIFF_COLORS: { [key in TariffType]: string } = {
     [TariffType.PEAK]: '#f97316',
@@ -54,10 +54,11 @@ interface ReportData {
   tempoStats?: StatsData;
   quickChargeStats?: StatsData;
   settings: Settings;
+  vehicle: UserVehicle;
 }
 
 const MonthlyReport: React.FC<{ data: ReportData }> = ({ data }) => {
-    const { month, year, monthlyCharges, monthlyMaintenance, monthlyStats, hpHcStats, tempoStats, quickChargeStats, settings } = data;
+    const { month, year, monthlyCharges, monthlyMaintenance, monthlyStats, hpHcStats, tempoStats, quickChargeStats, settings, vehicle } = data;
     const monthName = new Date(year, month).toLocaleString('fr-FR', { month: 'long' });
 
     const hasChargeData = monthlyStats && monthlyStats.totalKwh > 0;
@@ -94,8 +95,8 @@ const MonthlyReport: React.FC<{ data: ReportData }> = ({ data }) => {
                     <p className="text-lg font-semibold text-blue-600">{monthName} {year}</p>
                 </div>
                 <div className="text-right">
-                    <p className="font-semibold">{settings.vehicleModel}</p>
-                    <p className="text-sm text-slate-600">{settings.registrationNumber}</p>
+                    <p className="font-semibold">{vehicle.name} ({vehicle.model})</p>
+                    <p className="text-sm text-slate-600">{vehicle.registrationNumber}</p>
                 </div>
             </header>
 
