@@ -45,8 +45,15 @@ const CommunityStats: React.FC = () => {
             setLoading(true);
             setError(null);
             try {
-                const usersSnapshot = await db.collection('users').get();
-                setTotalUsers(usersSnapshot.size);
+                // Attempt to fetch user count, but gracefully fail if permissions are restrictive.
+                let userCount: number | null = null;
+                try {
+                    const usersSnapshot = await db.collection('users').get();
+                    userCount = usersSnapshot.size;
+                } catch (userCountError) {
+                    console.warn("Could not fetch user count. This is likely due to Firestore security rules and is expected.", userCountError);
+                }
+                setTotalUsers(userCount);
 
                 const statsSnapshot = await db.collection('globalStats').get();
                 const globalStatsData: GlobalStat[] = statsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as GlobalStat));
@@ -119,8 +126,10 @@ const CommunityStats: React.FC = () => {
                 </div>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <StatCard title="Utilisateurs Inscrits" value={totalUsers !== null ? totalUsers.toLocaleString('fr-FR') : '-'} icon={<Users size={24} />} />
+            <div className={`grid grid-cols-1 ${totalUsers !== null ? 'md:grid-cols-2' : ''} gap-6`}>
+                {totalUsers !== null && (
+                    <StatCard title="Utilisateurs Inscrits" value={totalUsers.toLocaleString('fr-FR')} icon={<Users size={24} />} />
+                )}
                 <StatCard title="Véhicules Enregistrés" value={totalVehicles !== null ? totalVehicles.toLocaleString('fr-FR') : '-'} icon={<Car size={24} />} />
             </div>
             
