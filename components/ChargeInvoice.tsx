@@ -41,7 +41,7 @@ const ChargeInvoice: React.FC<ChargeInvoiceProps> = ({ data }) => {
                         </svg>
                     </div>
                     <div>
-                        <h1 className="text-2xl font-bold text-slate-800">Suivi EV Online</h1>
+                        <h1 className="text-2xl font-bold text-slate-800">Volty-Conso</h1>
                         <p className="text-sm text-slate-500">Relevé de recharge électrique</p>
                     </div>
                 </div>
@@ -120,7 +120,7 @@ const ChargeInvoice: React.FC<ChargeInvoiceProps> = ({ data }) => {
             
             {/* Footer */}
             <footer className="absolute bottom-8 left-8 right-8 text-center text-xs text-slate-400 border-t border-slate-200 pt-4">
-                <p>Merci d'utiliser Suivi Conso EV Online pour le suivi de votre véhicule électrique.</p>
+                <p>Merci d'utiliser Volty-Conso pour le suivi de votre véhicule électrique.</p>
                 <p>Ce document est un relevé et non une facture officielle à valeur comptable.</p>
             </footer>
 

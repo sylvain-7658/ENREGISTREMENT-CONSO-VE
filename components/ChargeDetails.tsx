@@ -148,7 +148,7 @@ const ChargeDetails: React.FC = () => {
 Veuillez trouver en pièce jointe le relevé de la recharge.
 
 Cordialement,
-Votre application Suivi Conso EV Online`.trim().replace(/^\s+/gm, '');
+Votre application Volty-Conso`.trim().replace(/^\s+/gm, '');
                 
                 const mailtoLink = `mailto:${settings.recapEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
                 setEmailLink(mailtoLink);

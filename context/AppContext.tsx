@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useMemo, FC, PropsWithChildren, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useMemo, FC, PropsWithChildren, useState, useEffect, useCallback, useRef } from 'react';
 import { Settings, Charge, ProcessedCharge, VehiclePreset, Trip, ProcessedTrip, MaintenanceEntry, ProcessedMaintenanceEntry, View, TariffType, UserVehicle, MaintenanceType } from '../types';
 import { processCharges, processTrips, processMaintenanceEntries } from '../utils/calculations';
 import { vehicles as defaultVehlesPresets } from '../data/vehicleData';
@@ -103,6 +103,15 @@ const getPriceForTariff = (tariff: TariffType, customPrice: number | undefined, 
         default: return 0;
     }
 };
+
+// Helper hook to get the previous value of a prop or state.
+function usePrevious<T>(value: T): T | undefined {
+    const ref = useRef<T | undefined>(undefined);
+    useEffect(() => {
+        ref.current = value;
+    });
+    return ref.current;
+}
 
 export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
   const { currentUser, logout } = useAuth();
@@ -442,18 +451,28 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
   const addVehicle = async (vehicleData: Omit<UserVehicle, 'id'>) => {
     if (!currentUser) return;
     const newVehicleRef = await db.collection('users').doc(currentUser.uid).collection('vehicles').add(vehicleData);
-    // If it's the first vehicle, set it as active
     if (vehicles.length === 0) {
         await setActiveVehicleId(newVehicleRef.id);
     }
+    if (isOnline) {
+      updateGlobalStats(vehicleData.model, { vehicleCount: firebase.firestore.FieldValue.increment(1) });
+    }
   };
+
   const updateVehicle = async (id: string, vehicleData: Omit<UserVehicle, 'id'>) => {
     if (!currentUser) return;
+    const oldVehicle = vehicles.find(v => v.id === id);
+    if (isOnline && oldVehicle && oldVehicle.model !== vehicleData.model) {
+        updateGlobalStats(oldVehicle.model, { vehicleCount: firebase.firestore.FieldValue.increment(-1) });
+        updateGlobalStats(vehicleData.model, { vehicleCount: firebase.firestore.FieldValue.increment(1) });
+    }
     await db.collection('users').doc(currentUser.uid).collection('vehicles').doc(id).update(vehicleData);
   };
+  
   const deleteVehicle = async (id: string) => {
     if (!currentUser) return;
-    // Note: This is a destructive action. Consider soft deletes or archiving in a real app.
+    const vehicleToDelete = vehicles.find(v => v.id === id);
+    
     const batch = db.batch();
     batch.delete(db.collection('users').doc(currentUser.uid).collection('vehicles').doc(id));
     const [chargesToDelete, tripsToDelete, maintenanceToDelete] = await Promise.all([
@@ -465,6 +484,10 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
     tripsToDelete.docs.forEach(doc => batch.delete(doc.ref));
     maintenanceToDelete.docs.forEach(doc => batch.delete(doc.ref));
     await batch.commit();
+
+    if (isOnline && vehicleToDelete) {
+        updateGlobalStats(vehicleToDelete.model, { vehicleCount: firebase.firestore.FieldValue.increment(-1) });
+    }
   };
   
   const addCharge = async (chargeData: Omit<Charge, 'id' | 'status' | 'vehicleId'>) => {
@@ -748,6 +771,120 @@ export const AppProvider: FC<PropsWithChildren> = ({ children }) => {
   const processedCharges = useMemo(() => activeVehicle ? processCharges(completedCharges, settings, activeVehicle) : [], [completedCharges, settings, activeVehicle]);
   const processedTrips = useMemo(() => activeVehicle ? processTrips(tripsForActiveVehicle, settings, activeVehicle, processedCharges) : [], [tripsForActiveVehicle, settings, activeVehicle, processedCharges]);
   const processedMaintenanceEntries = useMemo(() => processMaintenanceEntries(maintenanceForActiveVehicle), [maintenanceForActiveVehicle]);
+
+  // --- Global Stats Synchronization ---
+    const sanitizeForId = (str: string) => str.replace(/[^a-zA-Z0-9]/g, '-');
+    
+    const updateGlobalStats = async (model: string, increments: { [key: string]: any }) => {
+        if (!model) return;
+        const modelId = sanitizeForId(model);
+        const docRef = db.collection('globalStats').doc(modelId);
+        try {
+            await docRef.set({
+                modelName: model,
+                ...increments
+            }, { merge: true });
+        } catch (error) {
+            console.warn("Could not update global stats:", error);
+        }
+    };
+
+    const prevProcessedCharges = usePrevious(processedCharges);
+    useEffect(() => {
+        if (!isOnline || !activeVehicle || !prevProcessedCharges) return;
+
+        const prevIds = new Set(prevProcessedCharges.map(c => c.id));
+        const currentIds = new Set(processedCharges.map(c => c.id));
+
+        // Added charges
+        processedCharges.forEach(charge => {
+            if (!prevIds.has(charge.id)) {
+                const increments = {
+                    totalKwhCharged: firebase.firestore.FieldValue.increment(charge.kwhAdded),
+                    totalChargeCost: firebase.firestore.FieldValue.increment(charge.cost),
+                    chargeCount: firebase.firestore.FieldValue.increment(1),
+                };
+                updateGlobalStats(activeVehicle.model, increments);
+            }
+        });
+
+        // Deleted charges
+        prevProcessedCharges.forEach(charge => {
+            if (!currentIds.has(charge.id)) {
+                const increments = {
+                    totalKwhCharged: firebase.firestore.FieldValue.increment(-charge.kwhAdded),
+                    totalChargeCost: firebase.firestore.FieldValue.increment(-charge.cost),
+                    chargeCount: firebase.firestore.FieldValue.increment(-1),
+                };
+                updateGlobalStats(activeVehicle.model, increments);
+            }
+        });
+    }, [processedCharges, isOnline, activeVehicle]);
+
+    const prevProcessedTrips = usePrevious(processedTrips);
+    useEffect(() => {
+        if (!isOnline || !activeVehicle || !prevProcessedTrips) return;
+
+        const prevIds = new Set(prevProcessedTrips.map(t => t.id));
+        const currentIds = new Set(processedTrips.map(t => t.id));
+
+        // Added trips
+        processedTrips.forEach(trip => {
+            if (!prevIds.has(trip.id)) {
+                const increments = {
+                    totalDistance: firebase.firestore.FieldValue.increment(trip.distance),
+                    totalKwhConsumedOnTrips: firebase.firestore.FieldValue.increment(trip.kwhConsumed),
+                    tripCount: firebase.firestore.FieldValue.increment(1),
+                };
+                updateGlobalStats(activeVehicle.model, increments);
+            }
+        });
+
+        // Deleted trips
+        prevProcessedTrips.forEach(trip => {
+            if (!currentIds.has(trip.id)) {
+                const increments = {
+                    totalDistance: firebase.firestore.FieldValue.increment(-trip.distance),
+                    totalKwhConsumedOnTrips: firebase.firestore.FieldValue.increment(-trip.kwhConsumed),
+                    tripCount: firebase.firestore.FieldValue.increment(-1),
+                };
+                updateGlobalStats(activeVehicle.model, increments);
+            }
+        });
+    }, [processedTrips, isOnline, activeVehicle]);
+
+    const prevMaintenance = usePrevious(processedMaintenanceEntries);
+    useEffect(() => {
+        if (!isOnline || !activeVehicle || !prevMaintenance) return;
+
+        const prevIds = new Set(prevMaintenance.map(m => m.id));
+        const currentIds = new Set(processedMaintenanceEntries.map(m => m.id));
+
+        // Added entries
+        processedMaintenanceEntries.forEach(entry => {
+            if (!prevIds.has(entry.id)) {
+                const increments: { [key: string]: any } = {
+                    totalMaintenanceCost: firebase.firestore.FieldValue.increment(entry.cost),
+                    maintenanceCount: firebase.firestore.FieldValue.increment(1),
+                    [`maintenanceCostByType.${entry.type}`]: firebase.firestore.FieldValue.increment(entry.cost)
+                };
+                updateGlobalStats(activeVehicle.model, increments);
+            }
+        });
+        
+        // Deleted entries
+        prevMaintenance.forEach(entry => {
+            if (!currentIds.has(entry.id)) {
+                 const increments: { [key: string]: any } = {
+                    totalMaintenanceCost: firebase.firestore.FieldValue.increment(-entry.cost),
+                    maintenanceCount: firebase.firestore.FieldValue.increment(-1),
+                    [`maintenanceCostByType.${entry.type}`]: firebase.firestore.FieldValue.increment(-entry.cost)
+                };
+                updateGlobalStats(activeVehicle.model, increments);
+            }
+        });
+    }, [processedMaintenanceEntries, isOnline, activeVehicle]);
+  // --- End Global Stats Synchronization ---
 
   const value = {
     settings,

@@ -1,12 +1,5 @@
 
-
-
-
-
-
-
-
-export type View = 'dashboard' | 'journal' | 'trajets' | 'entretien' | 'stats' | 'settings' | 'add-charge' | 'add-trip' | 'add-maintenance' | 'release-notes' | 'user-guide' | 'legal-info' | 'fleet-overview';
+export type View = 'dashboard' | 'journal' | 'trajets' | 'entretien' | 'stats' | 'settings' | 'add-charge' | 'add-trip' | 'add-maintenance' | 'release-notes' | 'user-guide' | 'legal-info' | 'fleet-overview' | 'community-stats';
 
 // Type pour les préréglages de véhicules de vehicleData.ts
 export interface VehiclePreset {

@@ -9,7 +9,7 @@ export const releaseNotes: ReleaseNote[] = [
     version: '6.0.0',
     date: '2025-09-02',
     changes: [
-      "Mise à jour du nom de l'application en 'SUIVI CONSO-FUN&LEC'.",
+      "Mise à jour du nom de l'application en 'Volty-Conso'.",
       "Mise à jour de la version majeure.",
     ],
   },

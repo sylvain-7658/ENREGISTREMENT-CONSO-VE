@@ -1,5 +1,5 @@
 {
-  "name": "SUIVI CONSO-FUN&LEC v6",
+  "name": "Copy of Volty-Conso",
   "description": "Une application pour suivre la consommation et les coûts de recharge d'un véhicule électrique.",
   "requestFramePermissions": [
     "camera"

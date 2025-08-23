@@ -1,6 +1,6 @@
 {
-  "short_name": "CONSO-FUN&LEC",
-  "name": "SUIVI CONSO-FUN&LEC",
+  "short_name": "Volty-Conso",
+  "name": "Volty-Conso",
   "description": "Une application pour suivre la consommation et les coûts de recharge d'un véhicule électrique.",
   "icons": [
     {
@@ -18,6 +18,6 @@
   ],
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f1f5f9",
+  "background_color": "#172554",
   "theme_color": "#2563eb"
 }

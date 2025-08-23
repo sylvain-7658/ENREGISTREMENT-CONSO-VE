@@ -8,7 +8,7 @@ const LegalInfo: React.FC = () => {
         <Card>
             <h2 className="text-3xl font-bold mb-2 text-slate-800 dark:text-slate-100">Informations Légales</h2>
             <p className="mb-8 text-slate-600 dark:text-slate-400">
-                Retrouvez ici toutes les informations légales relatives à l'utilisation de l'application Suivi Conso EV Online.
+                Retrouvez ici toutes les informations légales relatives à l'utilisation de l'application Volty-Conso.
             </p>
             <div className="space-y-2">
                 <p className="p-4 text-sm bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 rounded-lg">
@@ -35,7 +35,7 @@ const LegalInfo: React.FC = () => {
 
                 <Accordion title="Conditions Générales d'Utilisation (CGU)" icon={<FileText size={20} />}>
                     <div className="space-y-4 text-slate-600 dark:text-slate-300">
-                        <p>Les présentes CGU régissent l'accès et l'utilisation de l'application "Suivi Conso EV Online".</p>
+                        <p>Les présentes CGU régissent l'accès et l'utilisation de l'application "Volty-Conso".</p>
                         <h4 className="font-semibold text-lg text-slate-700 dark:text-slate-200">Article 1 : Objet</h4>
                         <p>L'application a pour objet de permettre aux utilisateurs de suivre la consommation, les recharges, et les coûts liés à l'utilisation d'un véhicule électrique.</p>
                         <h4 className="font-semibold text-lg text-slate-700 dark:text-slate-200">Article 2 : Accès et Compte Utilisateur</h4>
@@ -50,7 +50,7 @@ const LegalInfo: React.FC = () => {
                 <Accordion title="Conditions Générales de Vente (CGV)" icon={<ShoppingCart size={20} />}>
                     <div className="space-y-4 text-slate-600 dark:text-slate-300">
                         <h4 className="font-semibold text-lg text-slate-700 dark:text-slate-200">Article 1 : Objet</h4>
-                        <p>L'application "Suivi Conso EV Online" est fournie à titre gratuit. Les présentes CGV ont pour but de préciser qu'il n'y a aucune transaction financière entre l'utilisateur et l'éditeur pour l'utilisation des fonctionnalités de base de l'application.</p>
+                        <p>L'application "Volty-Conso" est fournie à titre gratuit. Les présentes CGV ont pour but de préciser qu'il n'y a aucune transaction financière entre l'utilisateur et l'éditeur pour l'utilisation des fonctionnalités de base de l'application.</p>
                         <h4 className="font-semibold text-lg text-slate-700 dark:text-slate-200">Article 2 : Gratuité</h4>
                         <p>L'accès et l'utilisation de l'ensemble des fonctionnalités de l'application sont entièrement gratuits. Aucune souscription payante n'est requise.</p>
                     </div>

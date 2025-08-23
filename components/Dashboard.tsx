@@ -9,7 +9,8 @@ import { TariffType } from '../types';
 import PendingCharges from './PendingCharges';
 import PendingTrips from './PendingTrips';
 import * as XLSX from 'xlsx';
-import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
+import { motion, useMotionValue, useTransform, animate, AnimatePresence } from 'framer-motion';
+import { Mascot } from './Mascot';
 
 const TARIFF_COLORS: { [key in TariffType]: string } = {
     [TariffType.PEAK]: '#f97316', // orange-500
@@ -82,33 +83,54 @@ const Gauge = ({ percentage, label, colorClass }: { percentage: number, label: s
     );
 };
 
-const DayChart = ({ data, highlightColorClass }: { data: { day: string; value: number }[], highlightColorClass: string }) => {
+const DayChart = ({ data, highlightColorClass, unit }: { data: { day: string; value: number }[], highlightColorClass: string, unit: string }) => {
     const maxValue = Math.max(...data.map(d => d.value), 1); // Avoid division by zero
     
     const barVariants = (value: number) => ({
-        hidden: { height: 0 },
+        hidden: { height: "0%" },
         visible: { height: `${(value / maxValue) * 100}%` },
     });
 
     return (
-        <div className="flex justify-around items-end h-full pt-2">
-            {data.map(item => {
-                const itemVariants = barVariants(item.value);
-                return (
-                    <div key={item.day} className="flex flex-col items-center group relative" style={{height: '60px'}}>
-                        <motion.div
-                            className={`w-4 rounded-full ${maxValue > 0 && item.value === maxValue ? highlightColorClass : 'bg-slate-300 dark:bg-slate-600'}`}
-                            initial={itemVariants.hidden}
-                            animate={itemVariants.visible}
+        <div className="flex justify-around items-end h-24">
+            {data.map(item => (
+                <div key={item.day} className="flex flex-col items-center w-full">
+                    {/* Value Label */}
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 1 }}
+                        className="flex flex-col items-center justify-center"
+                        style={{ height: '32px' }} // fixed height for the label container
+                    >
+                         {item.value > 0 ? (
+                             <>
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-200 leading-none">{Math.round(item.value)}</span>
+                                {unit && <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 leading-none mt-0.5">{unit}</span>}
+                            </>
+                         ) : (
+                            <span className="h-full">&nbsp;</span>
+                         )}
+                    </motion.div>
+
+                    {/* Bar */}
+                    <div className="w-4 h-12 flex items-end">
+                         <motion.div
+                            className={`w-full rounded-t-md ${maxValue > 0 && item.value === maxValue ? highlightColorClass : 'bg-slate-300 dark:bg-slate-600'}`}
+                            initial="hidden"
+                            animate="visible"
+                            variants={barVariants(item.value)}
                             transition={{ duration: 1, ease: "circOut" }}
                         />
-                        <span className="text-xs mt-1 font-bold text-slate-500 dark:text-slate-400">{item.day}</span>
                     </div>
-                );
-            })}
+                    
+                    {/* Day Label */}
+                    <span className="text-xs mt-1 font-bold text-slate-500 dark:text-slate-400">{item.day}</span>
+                </div>
+            ))}
         </div>
     );
-}
+};
 
 const InfoCard = ({ icon, title, value, unit, subtext, color = 'blue', decimals = 0, breakdown }: {
     icon: React.ReactElement<{ className?: string }>;
@@ -165,129 +187,6 @@ const InfoCard = ({ icon, title, value, unit, subtext, color = 'blue', decimals 
         </div>
     );
 };
-
-const mascotVariants = {
-    float: {
-        y: [-3, 3, -3],
-        transition: { duration: 4, ease: "easeInOut", repeat: Infinity }
-    },
-    shadowFloat: {
-        scaleX: [1, 0.95, 1],
-        transition: { duration: 4, ease: "easeInOut", repeat: Infinity }
-    },
-    eyebrowWink: {
-        d: [
-            "M 105 55 Q 115 50 125 55",
-            "M 105 55 Q 115 50 125 55",
-            "M 105 65 Q 115 60 125 65",
-            "M 105 65 Q 115 60 125 65",
-            "M 105 55 Q 115 50 125 55"
-        ],
-        transition: { duration: 4, repeat: Infinity, repeatDelay: 1, ease: "easeInOut", times: [0, 0.45, 0.5, 0.55, 1] }
-    },
-    eyeWink: {
-        scaleY: [1, 1, 0.1, 1],
-        transition: { duration: 4, repeat: Infinity, repeatDelay: 1, ease: "easeInOut", times: [0, 0.45, 0.5, 0.55] }
-    },
-    mouthSmile: {
-        d: [
-            "M 95 95 h 5",
-            "M 95 95 h 5",
-            "M 90 90 Q 97.5 105 105 90",
-            "M 90 90 Q 97.5 105 105 90",
-            "M 95 95 h 5"
-        ],
-        transition: { duration: 4, repeat: Infinity, repeatDelay: 1, ease: "easeInOut", times: [0, 0.45, 0.5, 0.55, 1] }
-    }
-};
-
-const Mascot = () => (
-    <motion.div
-        animate={mascotVariants.float}
-        className="flex-shrink-0"
-    >
-        <svg width="150" height="150" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" className="drop-shadow-lg">
-            {/* Shadow */}
-            <motion.ellipse
-                cx="100"
-                cy="185"
-                rx="60"
-                ry="8"
-                className="fill-black/10 dark:fill-black/20"
-                animate={mascotVariants.shadowFloat}
-            />
-            
-            <g transform="translate(10, 10)">
-                {/* Cable and Plug */}
-                <g>
-                    <path d="M 160,50 C 180,30 190,70 170,100 L 160,110 L 150,100 L 160,90 C 145,60 160,80 160,50" fill="#60a5fa" stroke="#2563eb" strokeWidth="2"/>
-                    <rect x="165" y="98" width="10" height="15" fill="#e2e8f0" transform="rotate(45 170 105)"/>
-                    <rect x="148" y="115" width="10" height="15" fill="#e2e8f0" transform="rotate(45 153 122)"/>
-                    <path d="M 170 105 L 175 100" stroke="#3b82f6" strokeWidth="6" strokeLinecap="round"/>
-                    <path d="M 153 122 L 158 117" stroke="#3b82f6" strokeWidth="6" strokeLinecap="round"/>
-                    <circle cx="160" cy="100" r="3" fill="#4ade80"/>
-                </g>
-
-                {/* Main Body */}
-                <g transform="rotate(-10 90 100)">
-                    <path d="M 50,40 C 40,20 150,20 140,40 L 140,150 C 150,170 40,170 50,150 z" fill="#60a5fa" stroke="#2563eb" strokeWidth="3" />
-                    <path d="M 50,40 C 40,20 150,20 140,40 L 140,80 L 50,80 z" fill="#93c5fd" />
-                    <path d="M 50,80 L 140,80" stroke="#2563eb" strokeWidth="3"/>
-
-                    {/* Arms */}
-                    <path d="M 50 110 C 10 90, 20 170, 50 150" stroke="#60a5fa" strokeWidth="12" fill="none" strokeLinecap="round" />
-                    <path d="M 49 110 C 9 90, 19 170, 49 150" stroke="#2563eb" strokeWidth="3" fill="none" strokeLinecap="round" />
-
-                    <path d="M 140 110 C 180 90, 170 170, 140 150" stroke="#60a5fa" strokeWidth="12" fill="none" strokeLinecap="round" />
-                    <path d="M 141 110 C 181 90, 171 170, 141 150" stroke="#2563eb" strokeWidth="3" fill="none" strokeLinecap="round" />
-                    
-                    {/* Power Symbol */}
-                    <circle cx="95" cy="125" r="18" fill="#4ade80" />
-                    <path d="M 90 115 L 100 115 L 95 125 L 105 125 L 85 138 L 95 128 L 90 128 z" fill="white" />
-
-                    {/* Face */}
-                    <path d="M 70 55 Q 80 50 90 55" stroke="#1e293b" strokeWidth="4" fill="none" strokeLinecap="round"/>
-                    
-                    {/* Eyebrow to animate */}
-                    <motion.path 
-                        d="M 105 55 Q 115 50 125 55" 
-                        stroke="#1e293b" strokeWidth="4" fill="none" strokeLinecap="round"
-                        animate={mascotVariants.eyebrowWink}
-                    />
-
-                    {/* Left Eye (viewer's left) */}
-                    <g>
-                        <ellipse cx="80" cy="70" rx="10" ry="12" fill="white" />
-                        <circle cx="80" cy="70" r="7" fill="#0ea5e9" />
-                        <circle cx="80" cy="70" r="3" fill="#1e293b" />
-                        <circle cx="83" cy="67" r="2" fill="white" />
-                    </g>
-                    {/* Right Eye (to be animated) */}
-                    <motion.g
-                        animate={mascotVariants.eyeWink}
-                        style={{ transformOrigin: "center 70px" }}
-                    >
-                        <ellipse cx="115" cy="70" rx="10" ry="12" fill="white" />
-                        <circle cx="115" cy="70" r="7" fill="#0ea5e9" />
-                        <circle cx="115" cy="70" r="3" fill="#1e293b" />
-                        <circle cx="118" cy="67" r="2" fill="white" />
-                    </motion.g>
-
-                    {/* Mouth */}
-                    <motion.path
-                        d="M 90 90 Q 97.5 105 105 90"
-                        stroke="#1e293b"
-                        strokeWidth="3"
-                        fill="none"
-                        strokeLinecap="round"
-                        animate={mascotVariants.mouthSmile}
-                    />
-                </g>
-            </g>
-        </svg>
-    </motion.div>
-);
-
 
 const Dashboard: React.FC = () => {
     const { charges, settings, maintenanceEntries, setActiveView, activeVehicle, vehicles, importCharges } = useAppContext();
@@ -724,83 +623,77 @@ const Dashboard: React.FC = () => {
 
     if (vehicles.length === 0) {
         return (
-            <div className="space-y-8">
-                 <div className="text-center bg-white dark:bg-slate-800 p-8 rounded-xl shadow-md border border-slate-200/80 dark:border-slate-700/80">
-                     <div className="flex justify-center items-center">
-                        <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
-                            <Car size={32} strokeWidth={1.5} className="text-blue-500" />
+            <Card>
+                <div className="flex flex-col md:flex-row items-center justify-center gap-8 p-6 md:p-10">
+                    <div className="flex-shrink-0">
+                        <Mascot />
+                    </div>
+                    <div className="flex-grow text-center md:text-left">
+                        <h1 className="text-3xl md:text-4xl font-bold text-slate-800 dark:text-slate-100">
+                            Bonjour ! Je suis Volty, votre copilote électrique.
+                        </h1>
+                        <p className="mt-4 text-lg text-slate-600 dark:text-slate-300 max-w-lg mx-auto md:mx-0">
+                            Je suis là pour vous aider à suivre vos recharges, analyser vos coûts et optimiser votre conduite. Pour commencer, configurons ensemble votre premier véhicule.
+                        </p>
+                        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
+                            <button 
+                                onClick={() => setActiveView('settings')}
+                                className="inline-flex items-center gap-3 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-transform hover:scale-105 duration-300"
+                            >
+                                <Car size={20} />
+                                Configurer mon premier véhicule
+                            </button>
+                            <button 
+                                onClick={() => setActiveView('user-guide')}
+                                className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                                Lire la notice d'utilisation
+                                <ArrowRight size={14} />
+                            </button>
                         </div>
-                     </div>
-                     <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-6 mb-2">Bienvenue sur Suivi EV Online !</h1>
-                     <p className="text-slate-500 dark:text-slate-400 mb-4 max-w-md mx-auto">Pour commencer, veuillez ajouter votre premier véhicule dans les paramètres. Vous pourrez ensuite personnaliser les tarifs d'électricité et autres options selon votre utilisation.</p>
-                     <p className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-8 max-w-lg mx-auto">
-                        Avant toute utilisation, rendez-vous à la section "Notice" afin de découvrir toutes les fonctionnalités offertes par votre application.
-                     </p>
-                     <div className="flex flex-col items-center space-y-4">
-                        <button 
-                            onClick={() => setActiveView('settings')}
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-transform hover:scale-105 duration-300"
-                        >
-                            <Settings size={20} />
-                            Aller aux Paramètres
-                        </button>
                     </div>
                 </div>
-            </div>
+            </Card>
         );
     }
     
     if (charges.length < 2) {
         return (
             <div className="space-y-8">
-                 <PendingCharges />
-                 <PendingTrips />
-                 <div className="text-center bg-white dark:bg-slate-800 p-8 rounded-xl shadow-md border border-slate-200/80 dark:border-slate-700/80">
-                     <div className="flex justify-center items-center">
-                        <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center">
-                             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-blue-500">
-                                <path d="M13 3V9H18L10 21V15H5L13 3Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+                <PendingCharges />
+                <PendingTrips />
+                <Card>
+                    <div className="flex flex-col md:flex-row items-center justify-center gap-8 p-6 md:p-10">
+                        <div className="flex-shrink-0">
+                            <Mascot />
                         </div>
-                     </div>
-                     <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-6 mb-2">Prêt à démarrer !</h1>
-                     <p className="text-slate-500 dark:text-slate-400 mb-4 max-w-md mx-auto">Votre véhicule est configuré. Ajoutez maintenant au moins deux recharges pour que l'application puisse calculer votre consommation et générer vos premières statistiques.</p>
-                     <p className="text-lg font-semibold text-blue-800 dark:text-blue-300 mb-8 max-w-lg mx-auto">
-                        Avant toute utilisation, rendez-vous à la section "Notice" afin de découvrir toutes les fonctionnalités offertes par votre application.
-                     </p>
-                     <div className="flex flex-col items-center space-y-4">
-                        <button 
-                            onClick={() => setActiveView('add-charge')}
-                            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-transform hover:scale-105 duration-300"
-                        >
-                            <PlusCircle size={20} />
-                            Ajouter ma première recharge
-                        </button>
-
-                        <div className="text-sm text-slate-500 dark:text-slate-400 py-2">ou si vous avez un historique à importer</div>
-
-                        <button
-                            onClick={handleImportClick}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-semibold rounded-lg shadow-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                        >
-                            <Upload size={16} />
-                            Importer une sauvegarde
-                        </button>
-                        <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
-
-                        <p className="text-xs text-center text-slate-500 dark:text-slate-400 max-w-xs">
-                            Importez votre historique de recharges depuis un fichier (XLSX, CSV).
-                        </p>
-                        
-                        <button 
-                            onClick={() => setActiveView('settings')}
-                            className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline pt-4"
-                        >
-                            <Settings size={16} />
-                            Revoir les paramètres
-                        </button>
+                        <div className="flex-grow text-center md:text-left">
+                            <h1 className="text-3xl md:text-4xl font-bold text-slate-800 dark:text-slate-100">
+                                Prêt à démarrer !
+                            </h1>
+                            <p className="mt-4 text-lg text-slate-600 dark:text-slate-300 max-w-lg mx-auto md:mx-0">
+                                Votre véhicule est configuré. Pour que je puisse analyser votre consommation, j'ai besoin d'au moins deux recharges. Enregistrons la première !
+                            </p>
+                            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center md:justify-start gap-4">
+                                <button
+                                    onClick={() => setActiveView('add-charge')}
+                                    className="inline-flex items-center gap-3 px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transition-transform hover:scale-105 duration-300"
+                                >
+                                    <PlusCircle size={20} />
+                                    Ajouter ma première recharge
+                                </button>
+                                <button
+                                    onClick={handleImportClick}
+                                    className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline"
+                                >
+                                    <Upload size={14} />
+                                    Importer un historique
+                                </button>
+                                <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx, .xls, .csv" />
+                            </div>
+                        </div>
                     </div>
-                </div>
+                </Card>
             </div>
         );
     }
@@ -896,11 +789,11 @@ const Dashboard: React.FC = () => {
                         </div>
                         <div className="bg-slate-100 dark:bg-slate-900/50 p-4 rounded-xl flex flex-col justify-center">
                             <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">Le Jour du Plein est le <span className="text-purple-600 dark:text-purple-400 font-bold">{summary.mostFrequentChargeDay.dayName}</span></h3>
-                            <DayChart data={summary.chargesByDayOfWeek} highlightColorClass="bg-purple-500" />
+                            <DayChart data={summary.chargesByDayOfWeek} highlightColorClass="bg-purple-500" unit="" />
                         </div>
                         <div className="bg-slate-100 dark:bg-slate-900/50 p-4 rounded-xl flex flex-col justify-center">
                             <h3 className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">En Route surtout le <span className="text-cyan-600 dark:text-cyan-400 font-bold">{summary.mostFrequentDriveDay.dayName}</span></h3>
-                             <DayChart data={summary.drivesByDayOfWeek} highlightColorClass="bg-cyan-500" />
+                             <DayChart data={summary.drivesByDayOfWeek} highlightColorClass="bg-cyan-500" unit="km" />
                         </div>
                         <div className="sm:col-span-2 bg-slate-100 dark:bg-slate-900/50 p-4 rounded-xl flex flex-col justify-between">
                             <div>
