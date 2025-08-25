@@ -1,5 +1,5 @@
 {
-  "name": "volty-consov2",
+  "name": "volty-conso-fichier-de-travail-multi-compte",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -18,7 +18,9 @@
     "html2canvas": "^1.4.1",
     "framer-motion": "^11.3.19",
     "firebase": "^12.1.0",
-    "@google/genai": "latest"
+    "@google/genai": "latest",
+    "firebase-functions": "^6.4.0",
+    "firebase-admin": "^13.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
